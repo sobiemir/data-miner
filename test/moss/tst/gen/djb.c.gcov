@@ -1,0 +1,154 @@
+        -:    0:Source:../../src/hash/djb.c
+        -:    0:Programs:7
+        -:    1:/*
+        -:    2: *  Moss Library >>> http://moss.aculo.pl
+        -:    3: *
+        -:    4: *     /'\_/`\                           
+        -:    5: *    /\      \    ___     ____    ____  
+        -:    6: *    \ \ \__\ \  / __`\  /',__\  /',__\ 
+        -:    7: *     \ \ \_/\ \/\ \L\ \/\__, `\/\__, `\
+        -:    8: *      \ \_\\ \_\ \____/\/\____/\/\____/
+        -:    9: *       \/_/ \/_/\/___/  \/___/  \/___/ 
+        -:   10: *
+        -:   11: *  Source file for "Hash" module, DJB algorithms [Public Domain].
+        -:   12: *  All modifications are based on GPLv3 license.
+        -:   13: *  
+        -:   14: *  This file is part of Moss Library
+        -:   15: *  Copyright (c) by sobiemir <sobiemir@aculo.pl>
+        -:   16: *
+        -:   17: *  This program is free software: you can redistribute it and/or modify
+        -:   18: *  it under the terms of the GNU General Public License as published by
+        -:   19: *  the Free Software Foundation, either version 3 of the License, or
+        -:   20: *  (at your option) any later version.
+        -:   21: *
+        -:   22: *  This program is distributed in the hope that it will be useful,
+        -:   23: *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+        -:   24: *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        -:   25: *  GNU General Public License for more details.
+        -:   26: *
+        -:   27: *  You should have received a copy of the GNU General Public License
+        -:   28: *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+        -:   29: */
+        -:   30:
+        -:   31:#include <moss/hash.h>
+        -:   32:
+        -:   33:#ifdef MSD_COMPILER_MSC
+        -:   34:	__pragma( warning(push) )
+        -:   35:	__pragma( warning(disable:4127))    /* conditional expression is constant */
+        -:   36:#endif
+        -:   37:
+        -:   38:/* ================================================================================================================== */
+        -:   39:
+        2:   40:uint32_t ms_hash_32_djb2( const void *data, size_t length )
+        -:   41:{
+        2:   42:	uint32_t       hash = 5381;
+        2:   43:	const uint8_t *cdat = data;
+        -:   44:
+        2:   45:	assert( data );
+        -:   46:
+       32:   47:	for( ; length; --length )
+       30:   48:		hash = ((hash << 5) + hash) + *cdat++;
+        -:   49:
+        2:   50:	return hash;
+        -:   51:}
+        -:   52:
+        -:   53:/* ================================================================================================================== */
+        -:   54:
+        2:   55:uint32_t ms_hash_32_djb2a( const void *data, size_t length )
+        -:   56:{
+        2:   57:	uint32_t       hash = 5381;
+        2:   58:	const uint8_t *cdat = data;
+        -:   59:
+        2:   60:	assert( data );
+        -:   61:
+       32:   62:	for( ; length; --length )
+       30:   63:		hash = ((hash << 5) + hash) ^ *cdat++;
+        -:   64:
+        2:   65:	return hash;
+        -:   66:}
+        -:   67:
+        -:   68:#ifdef MSD_HASH_MBS_FUNCTIONS
+        -:   69:
+        -:   70:/* ================================================================================================================== */
+        -:   71:
+        1:   72:uint32_t ms_hash_mbs_32_djb2( const char *data )
+        -:   73:{
+        1:   74:	uint32_t hash = 5381;
+        -:   75:	int      c;
+        -:   76:
+        1:   77:	assert( data );
+        -:   78:
+        8:   79:	while( (c = (uint8_t)*data++) != 0 )
+        6:   80:		hash = ((hash << 5) + hash) + c;
+        -:   81:
+        1:   82:	return hash;
+        -:   83:}
+        -:   84:
+        -:   85:/* ================================================================================================================== */
+        -:   86:
+        1:   87:uint32_t ms_hash_mbs_32_djb2a( const char *data )
+        -:   88:{
+        1:   89:	uint32_t hash = 5381;
+        -:   90:	int      c;
+        -:   91:
+        1:   92:	assert( data );
+        -:   93:
+        8:   94:	while( (c = (uint8_t)*data++) != 0 )
+        6:   95:		hash = ((hash << 5) + hash) ^ c;
+        -:   96:
+        1:   97:	return hash;
+        -:   98:}
+        -:   99:
+        -:  100:#endif
+        -:  101:#ifdef MSD_HASH_WCS_FUNCTIONS
+        -:  102:
+        -:  103:/* ================================================================================================================== */
+        -:  104:
+        1:  105:uint32_t ms_hash_wcs_32_djb2( const wchar_t *data )
+        -:  106:{
+        1:  107:	uint32_t hash = 5381;
+        -:  108:	wint_t   c;
+        -:  109:
+        1:  110:	assert( data );
+        -:  111:
+        -:  112:	if( sizeof(wchar_t) == 2 )
+        -:  113:		while( (c = (uint16_t)*data++) != 0 )
+        -:  114:			hash = ((hash << 5) + hash) + ((uint32_t)(c & 0x00FF)     ),
+        -:  115:			hash = ((hash << 5) + hash) + ((uint32_t)(c & 0xFF00) >> 8);
+        -:  116:	else if( sizeof(wchar_t) == 4 )
+        8:  117:		while( (c = (uint32_t)*data++) != 0 )
+        6:  118:			hash = ((hash << 5) + hash) + ((uint32_t)(c & 0x000000FF)      ),
+        6:  119:			hash = ((hash << 5) + hash) + ((uint32_t)(c & 0x0000FF00) >> 8 ),
+        6:  120:			hash = ((hash << 5) + hash) + ((uint32_t)(c & 0x00FF0000) >> 16),
+        6:  121:			hash = ((hash << 5) + hash) + ((uint32_t)(c & 0xFF000000) >> 24);
+        -:  122:
+        1:  123:	return hash;
+        -:  124:}
+        -:  125:
+        -:  126:/* ================================================================================================================== */
+        -:  127:
+        1:  128:uint32_t ms_hash_wcs_32_djb2a( const wchar_t *data )
+        -:  129:{
+        1:  130:	uint32_t hash = 5381;
+        -:  131:	wint_t   c;
+        -:  132:
+        1:  133:	assert( data );
+        -:  134:
+        -:  135:	if( sizeof(wchar_t) == 2 )
+        -:  136:		while( (c = (uint16_t)*data++) != 0 )
+        -:  137:			hash = ((hash << 5) + hash) ^ ((uint32_t)(c & 0x00FF)     ),
+        -:  138:			hash = ((hash << 5) + hash) ^ ((uint32_t)(c & 0xFF00) >> 8);
+        -:  139:	else if( sizeof(wchar_t) == 4 )
+        8:  140:		while( (c = (uint32_t)*data++) != 0 )
+        6:  141:			hash = ((hash << 5) + hash) ^ ((uint32_t)(c & 0x000000FF)      ),
+        6:  142:			hash = ((hash << 5) + hash) ^ ((uint32_t)(c & 0x0000FF00) >> 8 ),
+        6:  143:			hash = ((hash << 5) + hash) ^ ((uint32_t)(c & 0x00FF0000) >> 16),
+        6:  144:			hash = ((hash << 5) + hash) ^ ((uint32_t)(c & 0xFF000000) >> 24);
+        -:  145:
+        1:  146:	return hash;
+        -:  147:}
+        -:  148:
+        -:  149:#endif
+        -:  150:#ifdef MSD_COMPILER_MSC
+        -:  151:	__pragma( warning(pop) )
+        -:  152:#endif

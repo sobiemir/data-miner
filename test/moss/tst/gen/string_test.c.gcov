@@ -1,0 +1,1396 @@
+        -:    0:Source:../string_test.c
+        -:    0:Programs:4
+        -:    1:/*
+        -:    2: *  Moss Library >>> http://moss.aculo.pl
+        -:    3: *
+        -:    4: *     /'\_/`\                           
+        -:    5: *    /\      \    ___     ____    ____  
+        -:    6: *    \ \ \__\ \  / __`\  /',__\  /',__\ 
+        -:    7: *     \ \ \_/\ \/\ \L\ \/\__, `\/\__, `\
+        -:    8: *      \ \_\\ \_\ \____/\/\____/\/\____/
+        -:    9: *       \/_/ \/_/\/___/  \/___/  \/___/ 
+        -:   10: *
+        -:   11: *  Test file for "String" module.
+        -:   12: *
+        -:   13: *  This file is part of Moss Library
+        -:   14: *  Copyright (c) by sobiemir <sobiemir@aculo.pl>
+        -:   15: *
+        -:   16: *  This program is free software: you can redistribute it and/or modify
+        -:   17: *  it under the terms of the GNU General Public License as published by
+        -:   18: *  the Free Software Foundation, either version 3 of the License, or
+        -:   19: *  (at your option) any later version.
+        -:   20: *
+        -:   21: *  This program is distributed in the hope that it will be useful,
+        -:   22: *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+        -:   23: *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        -:   24: *  GNU General Public License for more details.
+        -:   25: *
+        -:   26: *  You should have received a copy of the GNU General Public License
+        -:   27: *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+        -:   28: */
+        -:   29:
+        -:   30:#include <stdio.h>
+        -:   31:#include <locale.h>
+        -:   32:#include <stdint.h>
+        -:   33:#include <moss/string.h>
+        -:   34:#include <mstest.h>
+        -:   35:
+        -:   36:/**
+        -:   37: * Struktura zawierająca dane używane w funkcjach testujących.
+        -:   38: * Dane przekazywane są z funkcji do funkcji.
+        -:   39: * Dzięki temu po wystąpieniu błędu i przerwaniu funkcji, pamięć może zostać w prosty sposób zwolniona.
+        -:   40: * To właśnie głównie dzięki tej tablicy nie można zmieniać kolejności wywoływania testów.
+        -:   41: * Zapobiega wyciekom pamięci.
+        -:   42: */
+        -:   43:typedef struct MSSTST_STRING_DATA
+        -:   44:{
+        -:   45:	MS_STRING *Pointer1;   /* wskaźnik do ciągu znaków alokowanego w pamięci */
+        -:   46:	MS_STRING *Pointer2;   /* wskaźnik do drugiego ciągu znaków alokowanego w pamięci */
+        -:   47:	MS_STRING *Pointer3;   /* wskaźnik do trzeciego ciągu znaków alokowanego w pamięci */
+        -:   48:	MS_STRING  Local1;     /* zmienna dla ciągu znaków, zwracana przez return lub dla init */
+        -:   49:	MS_STRING  Local2;     /* druga zmienna dla ciągu znaków, zwracana przez return lub dla init */
+        -:   50:	MS_STRING  Local3;     /* trzecia zmienna dla ciągu znaków, zwracana przez return lub dla init */
+        -:   51:	MS_ARRAY   Array;
+        -:   52:}
+        -:   53:MSTST_STRING_DATA;
+        -:   54:
+        -:   55:/**
+        -:   56: * Pangramy.
+        -:   57: * Pangram to zdanie, które zawiera wszystkie litery w danym języku.
+        -:   58: */
+        -:   59:const char    PANGRAM1[] =  "Pack my box with five dozen liquor jugs.";
+        -:   60:const char    PANGRAM2[] =  "Pchnąć w tę łódź jeża lub ośm skrzyń fig.";
+        -:   61:const wchar_t PANGRAM3[] = L"Pchnąć w tę łódź jeża lub ośm skrzyń fig.";
+        -:   62:
+        -:   63:/* ilość bajtów przypadająca na dany znak dla polskiego pangramu */
+        -:   64:const int PANGRAM2MB[] = {
+        -:   65:/*  P  c  h  n  ą  ć     w     t  ę     ł  ó  d  ź     j  e  ż */
+        -:   66:	1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2,
+        -:   67:/*  a     l  u  b     o  ś  m     s  k  r  z  y  ń     f  i  g  . */
+        -:   68:	1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1
+        -:   69:};
+        -:   70:/* przesunięcie indeksu bajtu względem danego znaku dla polskiego pangramu */
+        -:   71:const int PANGRAM2OF[] = {
+        -:   72:/*  P   c   h   n   ą   ć       w       t   ę       ł   ó   d   ź       j   e   ż */
+        -:   73:	0,  1,  2,  3,  4,  6,  8,  9,  10, 11, 12, 14, 15, 17, 19, 20, 22, 23, 24, 25,
+        -:   74:/*  a       l   u   b       o   ś   m       s   k   r   z   y   ń       f   i   g   . */
+        -:   75:	27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 45, 46, 47, 48, 49
+        -:   76:};
+        -:   77:
+        -:   78:/**
+        -:   79: * Funkcja wywoływana przy kończeniu testu.
+        -:   80: * Zwalnia miejsce przydzielone w pamięci podczas działania programu.
+        -:   81: */
+        1:   82:void mst_string_teardown( MST_SUITE *suite )
+        -:   83:{
+        -:   84:	MSTST_STRING_DATA *data;
+        -:   85:
+        1:   86:	if( !suite->Data )
+    #####:   87:		return;
+        -:   88:
+        1:   89:	data = suite->Data;
+        -:   90:
+        1:   91:	ms_string_free( data->Pointer1 );
+        1:   92:	ms_string_free( data->Pointer2 );
+        1:   93:	ms_string_free( data->Pointer3 );
+        -:   94:
+        1:   95:	data->Pointer1 = NULL;
+        1:   96:	data->Pointer2 = NULL;
+        1:   97:	data->Pointer3 = NULL;
+        -:   98:
+        1:   99:	ms_string_free( &data->Local1 );
+        1:  100:	ms_string_free( &data->Local2 );
+        1:  101:	ms_string_free( &data->Local3 );
+        -:  102:
+        1:  103:	ms_array_free( &data->Array );
+        -:  104:}
+        -:  105:
+        -:  106:/*
+        -:  107:======================================================================================================================
+        -:  108:------------------------------------------------------------------------------------------------------------------
+        -:  109:	DŁUGOŚĆ CIĄGU / INFORMACJE
+        -:  110:------------------------------------------------------------------------------------------------------------------
+        -:  111:======================================================================================================================
+        -:  112:*/
+        -:  113:
+        1:  114:int mst_string_length_mbs( MST_FUNCTION *info )
+        -:  115:{
+        -:  116:	size_t length;
+        1:  117:	mst_prepare( info );
+        -:  118:
+        -:  119:	/* długość całego tekstu - 41 znaków, 50 bajtów */
+        1:  120:	length = ms_string_length_mbs( PANGRAM2, 0 );
+        1:  121:	mst_assert_uint( length, ==, 41 );
+        -:  122:
+        -:  123:	/* słowo: Pchnąć - 6 znaków, 8 bajtów */
+        1:  124:	length = ms_string_length_mbs( PANGRAM2, 8 );
+        1:  125:	mst_assert_uint( length, ==, 6 );
+        -:  126:
+        -:  127:	/* słowo: łódź - 4 znaki, 7 bajtów */
+        1:  128:	length = ms_string_length_mbs( &PANGRAM2[15], 7 );
+        1:  129:	mst_assert_uint( length, ==, 4 );
+        -:  130:
+        -:  131:	/* powinien być błąd - błędny znak po literze d w słowie łódź
+        -:  132:	   dlatego, że ź nie zostało podane w całości, ale w połowie. */
+        1:  133:	length = ms_string_length_mbs( &PANGRAM2[15], 6 );
+        1:  134:	mst_assert_uint( length, ==, 0 );
+        -:  135:	/* można sprawdzić dodatkowo ERRNO */
+        -:  136:
+        -:  137:	/* a teraz próba podania za dużej ilości bajtów (sam wyraz ma 50)
+        -:  138:	   o ile ciąg zakończony jest znakiem \0, to wszystko powinno być w porządku. */
+        1:  139:	length = ms_string_length_mbs( PANGRAM2, 100 );
+        1:  140:	mst_assert_uint( length, ==, 41 );
+        -:  141:
+        1:  142:	return MSEC_OK;
+        -:  143:}
+        -:  144:
+        1:  145:int mst_string_length_wcstombs( MST_FUNCTION *info )
+        -:  146:{
+        -:  147:	size_t  length;
+        -:  148:	wchar_t corrupted[5];
+        -:  149:
+        1:  150:	mst_prepare( info );
+        -:  151:
+        -:  152:	/* obliczanie długości wielobajtowego ciągu z wchar_t
+        -:  153:	   obliczana jest ilość bajtów, z których będzie się składał ciąg */
+        1:  154:	length = ms_string_length_wcstombs( PANGRAM3, 0 );
+        1:  155:	mst_assert_uint( length, ==, sizeof PANGRAM2 - 1 );
+        -:  156:
+        -:  157:	/* słowo: Pchnąć - 6 znaków, ale 8 bajtów */
+        1:  158:	length = ms_string_length_wcstombs( PANGRAM3, 6 );
+        1:  159:	mst_assert_uint( length, ==, 8 );
+        -:  160:
+        -:  161:	/* słowo: łódź - 4 znaki, 7 bajtów */
+        1:  162:	length = ms_string_length_wcstombs( &PANGRAM3[12], 4 );
+        1:  163:	mst_assert_uint( length, ==, 7 );
+        -:  164:
+        -:  165:	/* próba symulacji błędu */
+        1:  166:	corrupted[0] = L'Ż';
+        1:  167:	corrupted[1] = L'ó';
+        1:  168:	corrupted[2] = WCHAR_MIN; /* symulacja błędu (być może działa tylko na linuksie) */
+        1:  169:	corrupted[3] = L'ć';
+        1:  170:	corrupted[4] = L'\0';
+        -:  171:
+        1:  172:	length = ms_string_length_wcstombs( corrupted, 4 );
+        1:  173:	mst_assert_uint( length, ==, 0 );
+        -:  174:
+        -:  175:	/* próba podania za dużej ilości znaków
+        -:  176:	   jeżeli ciąg zakończony jest znakiem L\0, to wszystko powinno być w porządku */
+        1:  177:	length = ms_string_length_wcstombs( PANGRAM3, 100 );
+        1:  178:	mst_assert_uint( length, ==, sizeof PANGRAM2 - 1 );
+        -:  179:
+        1:  180:	return MSEC_OK;
+        -:  181:}
+        -:  182:
+        1:  183:int mst_string_info_mbs( MST_FUNCTION *info )
+        -:  184:{
+        -:  185:	MSTST_STRING_DATA *data;
+        -:  186:	int                ercode;
+        -:  187:	size_t             x, length;
+        -:  188:	MS_ARRAY          *array;
+        -:  189:
+        1:  190:	mst_prepare( info );
+        1:  191:	data = info->Data;
+        -:  192:
+        -:  193:	/* utwórz tablicę w której przechowywane będą dane o ciągu wielobajtowym */
+        1:  194:	data->Array = ms_array_return_local( sizeof(MS_MBINFO), 0 );
+        1:  195:	array = &data->Array;
+        -:  196:
+        1:  197:	mst_assert( array->Items );
+        -:  198:
+        -:  199:	/* pobierz tablicę z informacjami o znakach */
+        1:  200:	ercode = ms_string_info_mbs( PANGRAM2, 0, array );
+        1:  201:	mst_assert( ercode == MSEC_OK );
+        -:  202:
+        -:  203:	/* sprawdź jej długość */
+        1:  204:	length = ms_string_length_mbs( PANGRAM2, 0 );
+        1:  205:	mst_assert_uint( length, ==, array->Length );
+        -:  206:
+        -:  207:	/* i dane czy są poprawne */
+       42:  208:	for( x = 0; x < array->Length; ++x )
+        -:  209:	{
+       41:  210:		MS_MBINFO *mbinfo = &ms_array_get(array, MS_MBINFO, x);
+       41:  211:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[x] );
+       41:  212:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[x] );
+        -:  213:	}
+        -:  214:
+        -:  215:	/* wyczyść tablicę, dane nie są potrzebne w tym momencie */
+        1:  216:	ms_array_clear( array );
+        -:  217:
+        -:  218:	/* spróbuj jeszcze stworzyć tablicę dla danych, zawierających błędny znak */
+        1:  219:	ercode = ms_string_info_mbs( PANGRAM2, 7, array );
+        1:  220:	mst_assert( ercode == MSEC_INVALID_VALUE );
+        -:  221:
+        -:  222:	/* dane są dodawane do momentu wystąpienia błędu */
+        1:  223:	mst_assert_uint( array->Length, ==, 5 );
+        -:  224:
+        -:  225:	/* wyczyść tablicę po raz kolejny */
+        1:  226:	ms_array_clear( array );
+        -:  227:
+        -:  228:	/* pobierz tablicę z informacjami podając zbyt dużą wielkość ciągu znaków
+        -:  229:	   funkcja powinna sobie z tym poradzić */
+        1:  230:	ercode = ms_string_info_mbs( PANGRAM2, 100, array );
+        1:  231:	mst_assert( ercode == MSEC_OK );
+        -:  232:
+        -:  233:	/* sprawdź jej długość */
+        1:  234:	length = ms_string_length_mbs( PANGRAM2, 0 );
+        1:  235:	mst_assert_uint( length, ==, array->Length );
+        -:  236:
+        -:  237:	/* oraz dane, jak wcześniej */
+       42:  238:	for( x = 0; x < array->Length; ++x )
+        -:  239:	{
+       41:  240:		MS_MBINFO *mbinfo = &ms_array_get(array, MS_MBINFO, x);
+       41:  241:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[x] );
+       41:  242:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[x] );
+        -:  243:	}
+        -:  244:
+        -:  245:	/* sprawdź jeszcze dla ciągu jednobajtowego, powinien mieć same 1 */
+        1:  246:	ms_array_clear( array );
+        -:  247:
+        1:  248:	ercode = ms_string_info_mbs( PANGRAM1, 0, array );
+        1:  249:	mst_assert( ercode == MSEC_OK );
+        1:  250:	mst_assert_uint( array->Length, ==, sizeof PANGRAM1 - 1 );
+        -:  251:
+       41:  252:	for( x = 0; x < array->Length; ++x )
+        -:  253:	{
+       40:  254:		MS_MBINFO *mbinfo = &ms_array_get(array, MS_MBINFO, x);
+       40:  255:		mst_assert_uint( mbinfo->Bytes,  ==, 1 );
+       40:  256:		mst_assert_uint( mbinfo->Offset, ==, x );
+        -:  257:	}
+        -:  258:
+        1:  259:	return MSEC_OK;
+        -:  260:}
+        -:  261:
+        1:  262:int mst_string_info_wcstombs( MST_FUNCTION *info )
+        -:  263:{
+        -:  264:	MSTST_STRING_DATA *data;
+        -:  265:	int                ercode;
+        -:  266:	size_t             x;
+        -:  267:	MS_ARRAY          *array;
+        -:  268:	wchar_t            corrupted[5];
+        -:  269:
+        1:  270:	mst_prepare( info );
+        1:  271:	data = info->Data;
+        -:  272:
+        -:  273:	/* tablica powinna być zainicjalizowana we wcześniejszej funkcji */
+        1:  274:	mst_assert( data->Array.Items );
+        1:  275:	array = &data->Array;
+        1:  276:	ms_array_clear( array );
+        -:  277:
+        -:  278:	/* pobierz strukturę dla wielobajtowego ciągu znaków wprost z typu wchar_t */
+        1:  279:	ercode = ms_string_info_wcstombs( PANGRAM3, 0, array );
+        1:  280:	mst_assert( ercode == MSEC_OK );
+        1:  281:	mst_assert_uint( array->Length, ==, sizeof PANGRAM3 / sizeof(wchar_t) - 1 );
+        -:  282:
+        -:  283:	/* porównaj dane z poprawnymi */
+       42:  284:	for( x = 0; x < array->Length; ++x )
+        -:  285:	{
+       41:  286:		MS_MBINFO *mbinfo = &ms_array_get(array, MS_MBINFO, x);
+       41:  287:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[x] );
+       41:  288:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[x] );
+        -:  289:	}
+        -:  290:
+        -:  291:	/* wyczyść tablicę, dane nie są potrzebne w tym momencie */
+        1:  292:	ms_array_clear( array );
+        -:  293:
+        -:  294:	/* próba symulacji błędu */
+        1:  295:	corrupted[0] = L'Ż';
+        1:  296:	corrupted[1] = L'ó';
+        1:  297:	corrupted[2] = WCHAR_MIN; /* symulacja błędu (być może tylko na linuksie) */
+        1:  298:	corrupted[3] = L'ć';
+        1:  299:	corrupted[4] = '\0';
+        -:  300:
+        -:  301:	/* spróbuj jeszcze stworzyć tablicę dla danych, zawierających błędny znak */
+        1:  302:	ercode = ms_string_info_wcstombs( corrupted, 4, array );
+        1:  303:	mst_assert( ercode == MSEC_INVALID_VALUE );
+        -:  304:
+        -:  305:	/* dane są dodawane do momentu wystąpienia błędu */
+        1:  306:	mst_assert_uint( array->Length, ==, 2 );
+        1:  307:	ms_array_clear( array );
+        -:  308:
+        -:  309:	/* teraz to samo, tylko przekaż za dużą ilość znaków w ciągu
+        -:  310:	   powinno wszystko być w porządku z powodu ograniczenia */
+        1:  311:	ercode = ms_string_info_wcstombs( PANGRAM3, 100, array );
+        1:  312:	mst_assert( ercode == MSEC_OK );
+        1:  313:	mst_assert_uint( array->Length, ==, ms_string_length_mbs(PANGRAM2, 0) );
+        -:  314:
+        -:  315:	/* porównaj dane z poprawnymi */
+       42:  316:	for( x = 0; x < array->Length; ++x )
+        -:  317:	{
+       41:  318:		MS_MBINFO *mbinfo = &ms_array_get(array, MS_MBINFO, x);
+       41:  319:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[x] );
+       41:  320:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[x] );
+        -:  321:	}
+        -:  322:
+        1:  323:	return MSEC_OK;
+        -:  324:}
+        -:  325:
+        -:  326:/*
+        -:  327:======================================================================================================================
+        -:  328:------------------------------------------------------------------------------------------------------------------
+        -:  329:	TWORZENIE I NISZCZENIE CIĄGU ZNAKÓW
+        -:  330:------------------------------------------------------------------------------------------------------------------
+        -:  331:======================================================================================================================
+        -:  332:*/
+        -:  333:
+        1:  334:int mst_string_create_cs( MST_FUNCTION *info )
+        -:  335:{
+        -:  336:	MSTST_STRING_DATA *data;
+        -:  337:	MS_STRING         *str;
+        -:  338:
+        1:  339:	mst_prepare( info );
+        1:  340:	data = info->Data;
+        -:  341:
+        1:  342:	str = data->Pointer1 = ms_string_alloc_cs( PANGRAM1, 100 );
+        -:  343:
+        1:  344:	mst_assert(  str );
+        1:  345:	mst_assert(  str->Data.Char );
+        1:  346:	mst_assert( !str->Wide );
+        1:  347:	mst_assert(  str->Destroy );
+        1:  348:	mst_assert( !str->Hashed );
+        1:  349:	mst_assert( !str->MBInfo );
+        1:  350:	mst_assert(  str->FuncIncrease == MSC_ArrayFunctions.IncMultiply );
+        -:  351:
+        1:  352:	mst_assert_uint ( str->Length,   ==, sizeof PANGRAM1 - 1 );
+        1:  353:	mst_assert_uint ( str->Capacity, ==, 100 );
+        1:  354:	mst_assert_uint ( str->Hash,     ==, 0 );
+        1:  355:	mst_assert_float( str->Modifier, ==, 2.f );
+        -:  356:
+        1:  357:	mst_assert_cs( str->Data.Char, PANGRAM1 );
+        -:  358:
+        -:  359:	/* jednobajtowy ciąg znaków o pojemności takiej samej jak długość całego ciągu */
+        1:  360:	data->Local1 = ms_string_return_cs( PANGRAM1, 0 );
+        1:  361:	str = &data->Local1;
+        -:  362:
+        1:  363:	mst_assert(  str->Data.Char );
+        1:  364:	mst_assert( !str->Wide );
+        1:  365:	mst_assert( !str->Destroy );
+        1:  366:	mst_assert( !str->Hashed );
+        1:  367:	mst_assert( !str->MBInfo );
+        1:  368:	mst_assert(  str->FuncIncrease == MSC_ArrayFunctions.IncMultiply );
+        -:  369:
+        1:  370:	mst_assert_uint ( str->Length,   ==, sizeof PANGRAM1 - 1 );
+        1:  371:	mst_assert_uint ( str->Capacity, ==, sizeof PANGRAM1 );
+        1:  372:	mst_assert_uint ( str->Hash,     ==, 0 );
+        1:  373:	mst_assert_float( str->Modifier, ==, 2.f );
+        -:  374:
+        1:  375:	mst_assert_cs( str->Data.Char, PANGRAM1 );
+        -:  376:
+        1:  377:	return MSEC_OK;
+        -:  378:}
+        -:  379:
+        1:  380:int mst_string_create_mbs( MST_FUNCTION *info )
+        -:  381:{
+        -:  382:	MSTST_STRING_DATA *data;
+        -:  383:	MS_STRING         *str;
+        -:  384:	char               corrupted[32];
+        -:  385:
+        1:  386:	mst_prepare( info );
+        1:  387:	data = info->Data;
+        -:  388:
+        -:  389:	/* próbuj utworzyć ciąg znaków z błędnych danych */
+        1:  390:	IGRET strcpy( corrupted, "Pszczółka" );
+        1:  391:	corrupted[6] = '\0';
+        -:  392:
+        1:  393:	str = data->Pointer2 = ms_string_alloc_mbs( corrupted, 0 );
+        1:  394:	mst_assert( !data->Pointer2 );
+        -:  395:
+        -:  396:	/* teraz utwórz go */
+        1:  397:	str = data->Pointer2 = ms_string_alloc_mbs( PANGRAM2, 100 );
+        -:  398:
+        1:  399:	mst_assert(  str );
+        1:  400:	mst_assert(  str->Data.Char );
+        1:  401:	mst_assert( !str->Wide );
+        1:  402:	mst_assert(  str->Destroy );
+        1:  403:	mst_assert( !str->Hashed );
+        1:  404:	mst_assert(  str->MBInfo );
+        1:  405:	mst_assert(  str->FuncIncrease == MSC_ArrayFunctions.IncMultiply );
+        -:  406:
+        1:  407:	mst_assert_uint ( str->Length,   ==, sizeof PANGRAM2 - 1 );
+        1:  408:	mst_assert_uint ( str->Capacity, ==, 100 );
+        1:  409:	mst_assert_uint ( str->Hash,     ==, 0 );
+        1:  410:	mst_assert_float( str->Modifier, ==, 2.f );
+        -:  411:
+        1:  412:	mst_assert_mbs( str->Data.Char, PANGRAM2 );
+        -:  413:
+        -:  414:	/* urojona długość ciągu (ilość liter wyświetlanych na ekranie)
+        -:  415:	   poprawność tablicy została sprawdzona wcześniej, więc nie ma co się tutaj męczyć. */
+        1:  416:	mst_assert_uint( str->MBInfo->Length, ==, ms_string_length_mbs(PANGRAM2, 0) );
+        -:  417:
+        -:  418:	/* wielobajtowy ciąg znaków o pojemności takiej samej jak długość całego ciągu */
+        1:  419:	data->Local2 = ms_string_return_mbs( PANGRAM2, 0 );
+        1:  420:	str = &data->Local2;
+        -:  421:
+        1:  422:	mst_assert(  str->Data.Char );
+        1:  423:	mst_assert( !str->Wide );
+        1:  424:	mst_assert( !str->Destroy );
+        1:  425:	mst_assert( !str->Hashed );
+        1:  426:	mst_assert(  str->MBInfo );
+        1:  427:	mst_assert(  str->FuncIncrease == MSC_ArrayFunctions.IncMultiply );
+        -:  428:
+        1:  429:	mst_assert_uint ( str->Length,   ==, sizeof PANGRAM2 - 1 );
+        1:  430:	mst_assert_uint ( str->Capacity, ==, sizeof PANGRAM2 );
+        1:  431:	mst_assert_uint ( str->Hash,     ==, 0 );
+        1:  432:	mst_assert_float( str->Modifier, ==, 2.f );
+        -:  433:
+        -:  434:	/* rzeczywista długość wielobajtowego ciągu znaków */
+        1:  435:	mst_assert_uint( str->MBInfo->Length, ==, ms_string_length_mbs(PANGRAM2, 0) );
+        1:  436:	mst_assert_mbs( str->Data.Char, PANGRAM2 );
+        -:  437:
+        1:  438:	return MSEC_OK;
+        -:  439:}
+        -:  440:
+        1:  441:int mst_string_create_wcs( MST_FUNCTION *info )
+        -:  442:{
+        -:  443:	MSTST_STRING_DATA *data;
+        -:  444:	MS_STRING         *str;
+        -:  445:
+        1:  446:	mst_prepare( info );
+        1:  447:	data = info->Data;
+        -:  448:
+        1:  449:	str = data->Pointer3 = ms_string_alloc_wcs( PANGRAM3, 100 );
+        -:  450:
+        1:  451:	mst_assert(  str );
+        1:  452:	mst_assert(  str->Data.Wide );
+        1:  453:	mst_assert(  str->Wide );
+        1:  454:	mst_assert(  str->Destroy );
+        1:  455:	mst_assert( !str->Hashed );
+        1:  456:	mst_assert( !str->MBInfo );
+        1:  457:	mst_assert(  str->FuncIncrease == MSC_ArrayFunctions.IncMultiply );
+        -:  458:
+        1:  459:	mst_assert_uint ( str->Length,   ==, sizeof PANGRAM3 / sizeof(wchar_t) - 1 );
+        1:  460:	mst_assert_uint ( str->Capacity, ==, 100 );
+        1:  461:	mst_assert_uint ( str->Hash,     ==, 0 );
+        1:  462:	mst_assert_float( str->Modifier, ==, 2.f );
+        -:  463:
+        1:  464:	mst_assert_wcs( str->Data.Wide, PANGRAM3 );
+        -:  465:
+        -:  466:	/* lokalna wersja dla wchar_t o pojemności takiej samej jak długość ciągu */
+        1:  467:	data->Local3 = ms_string_return_wcs( PANGRAM3, 0 );
+        -:  468:
+        1:  469:	mst_assert(  data->Local3.Data.Wide );
+        1:  470:	mst_assert(  data->Local3.Wide );
+        1:  471:	mst_assert( !data->Local3.Destroy );
+        1:  472:	mst_assert( !data->Local3.Hashed );
+        1:  473:	mst_assert( !data->Local3.MBInfo );
+        1:  474:	mst_assert(  data->Local3.FuncIncrease == MSC_ArrayFunctions.IncMultiply );
+        -:  475:
+        1:  476:	mst_assert_uint ( data->Local3.Length,   ==, (sizeof PANGRAM3 / sizeof(wchar_t)) - 1 );
+        1:  477:	mst_assert_uint ( data->Local3.Capacity, ==, sizeof PANGRAM3 / sizeof(wchar_t) );
+        1:  478:	mst_assert_uint ( data->Local3.Hash,     ==, 0 );
+        1:  479:	mst_assert_float( data->Local3.Modifier, ==, 2.f );
+        -:  480:
+        1:  481:	mst_assert_wcs( data->Local3.Data.Wide, PANGRAM3 );
+        -:  482:
+        1:  483:	return MSEC_OK;
+        -:  484:}
+        -:  485:
+        1:  486:int mst_string_destroy( MST_FUNCTION *info )
+        -:  487:{
+        -:  488:	MSTST_STRING_DATA *data;
+        -:  489:
+        1:  490:	mst_prepare( info );
+        1:  491:	data = info->Data;
+        -:  492:
+        1:  493:	mst_assert( data->Pointer1 );
+        1:  494:	mst_assert( data->Pointer1->Data.Char );
+        1:  495:	mst_assert( data->Pointer2 );
+        1:  496:	mst_assert( data->Pointer2->Data.Char );
+        1:  497:	mst_assert( data->Pointer2->MBInfo );
+        1:  498:	mst_assert( data->Pointer3 );
+        1:  499:	mst_assert( data->Pointer3->Data.Char );
+        1:  500:	mst_assert( data->Local1.Data.Char );
+        1:  501:	mst_assert( data->Local2.Data.Char );
+        1:  502:	mst_assert( data->Local2.MBInfo );
+        1:  503:	mst_assert( data->Local3.Data.Char );
+        -:  504:
+        -:  505:	/* zwolnij pamięć - funkcja zwalnia wszystko */
+        1:  506:	ms_string_free( data->Pointer1 );
+        1:  507:	ms_string_free( data->Pointer2 );
+        1:  508:	ms_string_free( data->Pointer3 );
+        -:  509:	/* nie można sprawdzić danych po usunięciu struktury */
+        -:  510:
+        -:  511:	/* tutaj widać różnicę pomiędzy clear a free */
+        1:  512:	ms_string_clear( &data->Local1 );
+        1:  513:	mst_assert( data->Local1.Data.Char );
+        1:  514:	mst_assert_uint( data->Local1.Length, ==, 0 );
+        -:  515:
+        1:  516:	ms_string_free( &data->Local1 );
+        1:  517:	mst_assert( !data->Local1.Data.Char );
+        -:  518:
+        -:  519:	/* tutaj clear na wielobajtowym ciągu znaków */
+        1:  520:	ms_string_clear( &data->Local2 );
+        1:  521:	mst_assert( data->Local2.Data.Char );
+        1:  522:	mst_assert( data->Local2.MBInfo );
+        1:  523:	mst_assert_uint( data->Local2.Length, ==, 0 );
+        1:  524:	mst_assert_uint( data->Local2.MBInfo->Length, ==, 0 );
+        -:  525:
+        1:  526:	ms_string_free( &data->Local2 );
+        1:  527:	mst_assert( !data->Local2.Data.Char );
+        1:  528:	mst_assert( !data->Local2.MBInfo );
+        -:  529:
+        -:  530:	/* tutaj clear dla wchar_t */
+        1:  531:	ms_string_clear( &data->Local3 );
+        1:  532:	mst_assert( data->Local3.Data.Wide );
+        1:  533:	mst_assert_uint( data->Local3.Length, ==, 0 );
+        -:  534:
+        1:  535:	ms_string_free( &data->Local3 );
+        1:  536:	mst_assert( !data->Local2.Data.Char );
+        -:  537:
+        1:  538:	data->Pointer1 = NULL;
+        1:  539:	data->Pointer2 = NULL;
+        1:  540:	data->Pointer3 = NULL;
+        -:  541:
+        -:  542:	/* próbuj zwolnić coś, co nie prowadzi do niczego */
+        1:  543:	ms_string_free( data->Pointer1 );
+        -:  544:
+        1:  545:	return MSEC_OK;
+        -:  546:}
+        -:  547:
+        -:  548:/*
+        -:  549:======================================================================================================================
+        -:  550:------------------------------------------------------------------------------------------------------------------
+        -:  551:	ZMIANA POJEMNOŚCI
+        -:  552:------------------------------------------------------------------------------------------------------------------
+        -:  553:======================================================================================================================
+        -:  554:*/
+        -:  555:
+        1:  556:int mst_string_realloc( MST_FUNCTION *info )
+        -:  557:{
+        -:  558:	MSTST_STRING_DATA *data;
+        -:  559:	int                ercode;
+        -:  560:	MS_STRING         *str;
+        -:  561:
+        1:  562:	mst_prepare( info );
+        1:  563:	data = info->Data;
+        1:  564:	mst_assert( !data->Local1.Data.Char );
+        -:  565:
+        1:  566:	ercode = ms_string_init_cs( &data->Local1, "abc", 5 );
+        1:  567:	str    = &data->Local1;
+        -:  568:
+        1:  569:	mst_assert( ercode == MSEC_OK );
+        -:  570:
+        1:  571:	str->FuncIncrease = MSC_ArrayFunctions.IncPower;
+        1:  572:	str->Modifier     = 1.1f;
+        -:  573:
+        -:  574:	/* 5^1.1 = ~5.87, co daje po zaokrągleniu 5 - zaokrąglenie następuje w dół
+        -:  575:	   w takim przypadku do wartości powinno być dodane 1 */
+        1:  576:	ercode = ms_string_realloc( str, 0 );
+        1:  577:	mst_assert( ercode == MSEC_OK );
+        1:  578:	mst_assert_uint( str->Capacity, ==, 6 );
+        -:  579:
+        -:  580:	/* 6^1.71 = ~21.41, co daje po zaokrągleniu wartość 21 */
+        1:  581:	str->Modifier = 1.71f;
+        1:  582:	mst_assert( ercode == MSEC_OK );
+        1:  583:	ercode = ms_string_realloc( str, 0 );
+        1:  584:	mst_assert_uint( str->Capacity, ==, 21 );
+        -:  585:
+        1:  586:	str->FuncIncrease = MSC_ArrayFunctions.IncMultiply;
+        1:  587:	str->Modifier     = 2.f;
+        -:  588:
+        -:  589:	/* 21 * 2 == 42 */
+        1:  590:	mst_assert( ercode == MSEC_OK );
+        1:  591:	ercode = ms_string_realloc( str, 0 );
+        1:  592:	mst_assert_uint( str->Capacity, ==, 42 );
+        -:  593:
+        -:  594:	/* 42 + 2 = 44 */
+        1:  595:	str->FuncIncrease = MSC_ArrayFunctions.IncAdd;
+        1:  596:	mst_assert( ercode == MSEC_OK );
+        1:  597:	ercode = ms_string_realloc( str, 0 );
+        1:  598:	mst_assert_uint( str->Capacity, ==, 44 );
+        -:  599:
+        -:  600:	/* zmiana pojemności ciągu do podanej wartości, w tym przypadku powinno być 15 a nie 46 (34+2) */
+        1:  601:	mst_assert( ercode == MSEC_OK );
+        1:  602:	ercode = ms_string_realloc( str, 15 );
+        1:  603:	mst_assert_uint( str->Capacity, ==, 15 );
+        -:  604:
+        -:  605:	/* symulacja 8 elementów i zmiana pojemności ciągu do podanej wartości
+        -:  606:	   powinien wystąpić błąd, ponieważ chcemy za bardzo zmniejszyć pamięć
+        -:  607:	   dlaczego 8 a nie 9?
+        -:  608:	   ciąg powinien przechowywać dodatkowe miejsce na wartość NULL */
+        1:  609:	str->Length = 8;
+        1:  610:	ercode = ms_string_realloc( str, 8 );
+        1:  611:	mst_assert( ercode == MSEC_DATA_OVERFLOW );
+        1:  612:	mst_assert_uint( str->Capacity, ==, 15 );
+        -:  613:
+        -:  614:	/* no ale do 9 powinno się dać rady zmniejszyć */
+        1:  615:	ercode = ms_string_realloc( str, 9 );
+        1:  616:	mst_assert( ercode == MSEC_OK );
+        1:  617:	mst_assert_uint( str->Capacity, ==, 9 );
+        -:  618:
+        -:  619:	/* dokładne zwiększanie, w tym przypadku spodziewamy się błędu
+        -:  620:	 * ta technika nie działa na zwykłym realloc, lecz na min_realloc */
+        1:  621:	str->FuncIncrease = NULL;
+        1:  622:	ercode = ms_string_realloc( str, 0 );
+        1:  623:	mst_assert( ercode == MSEC_INVALID_VALUE );
+        1:  624:	mst_assert_uint( str->Capacity, ==, 9 );
+        -:  625:
+        -:  626:	/* zmniejsz do 5 */
+        1:  627:	str->Length = 3;
+        1:  628:	ercode = ms_string_realloc( str, 5 );
+        1:  629:	mst_assert( ercode == MSEC_OK );
+        1:  630:	mst_assert_uint( str->Capacity, ==, 5 );
+        -:  631:
+        1:  632:	return MSEC_OK;
+        -:  633:}
+        -:  634:
+        1:  635:int mst_string_realloc_min( MST_FUNCTION *info )
+        -:  636:{
+        -:  637:	MSTST_STRING_DATA *data;
+        -:  638:	int                ercode;
+        -:  639:	MS_STRING         *str;
+        -:  640:
+        1:  641:	mst_prepare( info );
+        1:  642:	data = info->Data;
+        1:  643:	mst_assert( data->Local1.Data.Char );
+        1:  644:	str = &data->Local1;
+        -:  645:
+        1:  646:	str->FuncIncrease = MSC_ArrayFunctions.IncPower;
+        1:  647:	str->Modifier     = 1.1f;
+        -:  648:
+        -:  649:	/* 5^1.1 = ~5.87 ~= 5 (+1 -> gdy lewa jest równa prawej) = 6 */
+        1:  650:	ercode = ms_string_realloc_min( str, 6 );
+        1:  651:	mst_assert( ercode == MSEC_OK );
+        1:  652:	mst_assert_uint( str->Capacity, ==, 6 );
+        -:  653:
+        -:  654:	/* 6^1.5 ~= 14.70, 14^1.5 ~= 52.38 -> STOP, wartość minimalna (20) została osiągnięta */
+        1:  655:	str->Modifier = 1.5f;
+        1:  656:	ercode = ms_string_realloc_min( str, 20 );
+        1:  657:	mst_assert( ercode == MSEC_OK );
+        1:  658:	mst_assert_uint( str->Capacity, ==, 52 );
+        -:  659:
+        -:  660:	/* w tym przypadku wartość nie powinna się zmienić, wystąpiło żądanie mniejszej wartości niż jest
+        -:  661:	 * tutaj 0 nie oznacza wartości automatycznej, podawana jest wartość minimalna */
+        1:  662:	ercode = ms_string_realloc_min( str, 20 );
+        1:  663:	mst_assert( ercode == MSEC_OK );
+        1:  664:	mst_assert_uint( str->Capacity, ==, 52 );
+        -:  665:
+        -:  666:	/* dokładne zwiększanie, powinna być osiągnięta tylko wartość minimalna */
+        1:  667:	str->FuncIncrease = NULL;
+        1:  668:	ercode = ms_string_realloc_min( str, 256 );
+        1:  669:	mst_assert( ercode == MSEC_OK );
+        1:  670:	mst_assert_uint( str->Capacity, ==, 256 );
+        -:  671:
+        -:  672:	/* zmniejsz ilość elementów do 2 */
+        1:  673:	ercode = ms_string_realloc( str, 5 );
+        1:  674:	mst_assert( ercode == MSEC_OK );
+        1:  675:	mst_assert_uint( str->Capacity, ==, 5 );
+        -:  676:
+        1:  677:	return MSEC_OK;
+        -:  678:}
+        -:  679:
+        -:  680:/*
+        -:  681:======================================================================================================================
+        -:  682:------------------------------------------------------------------------------------------------------------------
+        -:  683:	WSTAWIANIE ZNAKÓW / CIĄGU ZNAKÓW
+        -:  684:------------------------------------------------------------------------------------------------------------------
+        -:  685:======================================================================================================================
+        -:  686:*/
+        -:  687:
+        1:  688:int mst_string_cs_insert_cs( MST_FUNCTION *info )
+        -:  689:{
+        -:  690:	MSTST_STRING_DATA *data;
+        -:  691:	int                ercode;
+        -:  692:	MS_STRING         *str;
+        -:  693:
+        1:  694:	size_t p1s = sizeof PANGRAM1 - 1;
+        -:  695:	size_t x, y;
+        -:  696:
+        1:  697:	mst_prepare( info );
+        1:  698:	data = info->Data;
+        1:  699:	mst_assert( !data->Pointer1 );
+        -:  700:
+        1:  701:	str = data->Pointer1 = ms_string_alloc_cs( PANGRAM1, 0 );
+        1:  702:	mst_assert( str );
+        1:  703:	mst_assert( str->Data.Char );
+        -:  704:
+        -:  705:	/* dodaj "Pack" na koniec */
+        1:  706:	ercode = ms_string_push_cs( str, PANGRAM1, 4 );
+        1:  707:	mst_assert( ercode == MSEC_OK );
+        -:  708:
+        1:  709:	mst_assert_uint( str->Length,   ==, p1s + 4 );
+        1:  710:	mst_assert_uint( str->Capacity, ==, (p1s+1) * 2 );
+        -:  711:
+        -:  712:	/* próbuj wstawić coś pustego */
+        1:  713:	ercode = ms_string_insert_cs( str, 4, "", 0 );
+        1:  714:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        -:  715:
+        1:  716:	mst_assert_uint( str->Length,   ==, p1s + 4 );
+        1:  717:	mst_assert_uint( str->Capacity, ==, p1s * 2 + 2 );
+        -:  718:
+        -:  719:	/* dodaj po "Pack", automatycznie obliczając długość ciągu */
+        1:  720:	ercode = ms_string_insert_cs( str, 4, PANGRAM1, 0 );
+        1:  721:	mst_assert( ercode == MSEC_OK );
+        -:  722:
+        1:  723:	mst_assert_uint( str->Length,   ==, p1s + 4 + p1s );
+        1:  724:	mst_assert_uint( str->Capacity, ==, (p1s+1) * 4 );
+        -:  725:
+        -:  726:	/* próbuj wstawić poza zakres */
+        1:  727:	ercode = ms_string_insert_cs( str, 512, PANGRAM1, p1s );
+        1:  728:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        -:  729:
+        1:  730:	mst_assert_uint( str->Length,   ==, p1s + 4 + p1s );
+        1:  731:	mst_assert_uint( str->Capacity, ==, (p1s+1) * 4 );
+        -:  732:
+        -:  733:	/* sprawdź poprawność danych końcowych */
+        5:  734:	for( x = 0; x < 4; ++x )
+        4:  735:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[x] );
+       41:  736:	for( x = 4, y = 0; y < p1s; ++x, ++y )
+       40:  737:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[y] );
+       37:  738:	for( x = p1s + 4, y = 4; y < p1s; ++x, ++y )
+       36:  739:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[y] );
+        5:  740:	for( x = p1s + p1s, y = 0; y < 4; ++x, ++y )
+        4:  741:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[y] );
+        -:  742:
+        1:  743:	return MSEC_OK;
+        -:  744:}
+        -:  745:
+        1:  746:int mst_string_cs_insert_mbs( MST_FUNCTION *info )
+        -:  747:{
+        -:  748:	MSTST_STRING_DATA *data;
+        -:  749:	int                ercode;
+        -:  750:	MS_STRING         *str;
+        -:  751:
+        1:  752:	size_t p1s = sizeof PANGRAM1 - 1;
+        1:  753:	size_t p2s = ms_string_length_mbs( PANGRAM2, 0 );
+        -:  754:	size_t x, y;
+        -:  755:
+        1:  756:	mst_prepare( info );
+        1:  757:	data = info->Data;
+        -:  758:
+        1:  759:	str = data->Pointer1;
+        1:  760:	mst_assert( data->Pointer1 );
+        1:  761:	mst_assert( data->Pointer1->Data.Char );
+        -:  762:
+        1:  763:	ms_string_clear( str );
+        1:  764:	ercode = ms_string_push_cs( str, PANGRAM1, 0 );
+        1:  765:	mst_assert( ercode == MSEC_OK );
+        -:  766:
+        -:  767:	/* powinien być błąd - ostatni znak nie jest pełny */
+        1:  768:	ercode = ms_string_push_mbs( str, PANGRAM2, 5 );
+        1:  769:	mst_assert( ercode == MSEC_INVALID_VALUE );
+        -:  770:
+        -:  771:	/* teraz powinno dodać - "Pchnąć" na sam koniec */
+        1:  772:	ercode = ms_string_push_mbs( str, PANGRAM2, 8 );
+        1:  773:	mst_assert( ercode == MSEC_OK );
+        1:  774:	mst_assert_uint( str->Length, ==, p1s + 6 );
+        -:  775:
+        -:  776:	/* próbuj wstawić coś pustego
+        -:  777:	   przy sprawdzaniu jest + 6, gdyż wstawiono 6 znaków znajdujących się na 8 bajtach */
+        1:  778:	ercode = ms_string_insert_mbs( str, 4, "", 0 );
+        1:  779:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        1:  780:	mst_assert_uint( str->Length, ==, p1s + 6 );
+        -:  781:
+        -:  782:	/* dodaj po "Pack", automatycznie obliczając długość ciągu */
+        1:  783:	ercode = ms_string_insert_mbs( str, 4, PANGRAM2, 0 );
+        1:  784:	mst_assert( ercode == MSEC_OK );
+        1:  785:	mst_assert_uint( str->Length, ==, p1s + p2s + 6 );
+        -:  786:
+        -:  787:	/* próbuj wstawić poza zakres */
+        1:  788:	ercode = ms_string_insert_mbs( str, 512, PANGRAM2, sizeof PANGRAM2 - 1 );
+        1:  789:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        1:  790:	mst_assert_uint( str->Length, ==, p1s + p2s + 6 );
+        -:  791:
+        -:  792:	/* pobierz informacje o wielobajtowym ciągu znaków dla sprawdzenia */
+        1:  793:	ms_array_clear( &data->Array );
+        1:  794:	ercode = ms_string_info_mbs( PANGRAM2, p2s, &data->Array );
+        1:  795:	mst_assert( ercode == MSEC_OK );
+        -:  796:
+        -:  797:	/* sprawdź poprawność danych końcowych */
+        5:  798:	for( x = 0; x < 4; ++x )
+        4:  799:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[x] );
+       34:  800:	for( x = 4, y = 0; y < data->Array.Length; ++x, ++y )
+       33:  801:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[ms_array_getl(data->Array, MS_MBINFO, y).Offset] );
+       37:  802:	for( x = p2s + 4, y = 4; y < p1s; ++x, ++y )
+       36:  803:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[y] );
+        7:  804:	for( x = p2s + p1s, y = 0; y < 6; ++x, ++y )
+        6:  805:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[ms_array_getl(data->Array, MS_MBINFO, y).Offset] );
+        -:  806:
+        1:  807:	return MSEC_OK;
+        -:  808:}
+        -:  809:
+        1:  810:int mst_string_cs_insert_wcs( MST_FUNCTION *info )
+        -:  811:{
+        -:  812:	MSTST_STRING_DATA *data;
+        -:  813:	int                ercode;
+        -:  814:	MS_STRING         *str;
+        -:  815:
+        1:  816:	size_t p1s = sizeof PANGRAM1 - 1;
+        1:  817:	size_t p3s = sizeof PANGRAM3 / sizeof(wchar_t) - 1;
+        -:  818:	size_t x, y;
+        -:  819:
+        1:  820:	mst_prepare( info );
+        1:  821:	data = info->Data;
+        -:  822:
+        1:  823:	str = data->Pointer1;
+        1:  824:	mst_assert( data->Pointer1 );
+        1:  825:	mst_assert( data->Pointer1->Data.Char );
+        -:  826:
+        1:  827:	ms_string_clear( str );
+        1:  828:	ercode = ms_string_push_cs( str, PANGRAM1, 0 );
+        1:  829:	mst_assert( ercode == MSEC_OK );
+        -:  830:
+        -:  831:	/* dodaj część na koniec - "Pchnąć"" */
+        1:  832:	ercode = ms_string_push_wcs( str, PANGRAM3, 6 );
+        1:  833:	mst_assert( ercode == MSEC_OK );
+        1:  834:	mst_assert_uint( str->Length, ==, p1s + 6 );
+        -:  835:
+        -:  836:	/* próbuj wstawić coś pustego */
+        1:  837:	ercode = ms_string_insert_wcs( str, 4, L"", 0 );
+        1:  838:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        1:  839:	mst_assert_uint( str->Length, ==, p1s + 6 );
+        -:  840:
+        -:  841:	/* dodaj po "Pack", automatycznie obliczając długość ciągu */
+        1:  842:	ercode = ms_string_insert_wcs( str, 4, PANGRAM3, 0 );
+        1:  843:	mst_assert( ercode == MSEC_OK );
+        1:  844:	mst_assert_uint( str->Length, ==, p1s + 6 + p3s );
+        -:  845:
+        -:  846:	/* próbuj wstawić poza zakres */
+        1:  847:	ercode = ms_string_insert_wcs( str, 512, PANGRAM3, p3s );
+        1:  848:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        1:  849:	mst_assert_uint( str->Length, ==, p1s + 6 + p3s );
+        -:  850:
+        -:  851:	/* sprawdź poprawność danych końcowych */
+        5:  852:	for( x = 0; x < 4; ++x )
+        4:  853:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[x] );
+       41:  854:	for( x = 4, y = 0; y < p1s; ++x, ++y )
+       40:  855:		mst_assert_sint( str->Data.Char[x], ==, (char)PANGRAM3[y] );
+       37:  856:	for( x = p3s + 4, y = 4; y < p1s; ++x, ++y )
+       36:  857:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[y] );
+        7:  858:	for( x = p1s + p3s, y = 0; y < 6; ++x, ++y )
+        6:  859:		mst_assert_sint( str->Data.Char[x], ==, (char)PANGRAM3[y] );
+        -:  860:
+        1:  861:	return MSEC_OK;
+        -:  862:}
+        -:  863:
+        1:  864:int mst_string_mbs_insert_mbs( MST_FUNCTION *info )
+        -:  865:{
+        -:  866:	MSTST_STRING_DATA *data;
+        -:  867:	int                ercode;
+        -:  868:	MS_STRING         *str;
+        -:  869:
+        1:  870:	size_t p2sm = ms_string_length_mbs( PANGRAM2, 0 );
+        1:  871:	size_t p2s  = sizeof PANGRAM2 - 1;
+        -:  872:	size_t x, y, offset;
+        -:  873:
+        1:  874:	mst_prepare( info );
+        1:  875:	data = info->Data;
+        1:  876:	mst_assert( !data->Pointer2 );
+        -:  877:
+        1:  878:	str = data->Pointer2 = ms_string_alloc_mbs( PANGRAM2, 0 );
+        1:  879:	mst_assert( str );
+        1:  880:	mst_assert( str->Data.Char );
+        -:  881:
+        -:  882:	/* powinien być błąd - ostatni znak nie jest pełny */
+        1:  883:	ercode = ms_string_push_mbs( str, PANGRAM2, 5 );
+        1:  884:	mst_assert( ercode == MSEC_INVALID_VALUE );
+        1:  885:	mst_assert_uint( str->Capacity, ==, p2s + 1 );
+        -:  886:
+        -:  887:	/* teraz powinno dodać - "Pchnąć" */
+        1:  888:	ercode = ms_string_push_mbs( str, PANGRAM2, 8 );
+        1:  889:	mst_assert( ercode == MSEC_OK );
+        1:  890:	mst_assert_uint( str->Capacity, ==, (p2s+1) * 2 );
+        -:  891:
+        -:  892:	/* próbuj wstawić coś pustego
+        -:  893:	   przy sprawdzaniu jest + 6, gdyż wstawiono 6 znaków znajdujących się na 8 bajtach */
+        1:  894:	ercode = ms_string_insert_mbs( str, 4, "", 0 );
+        1:  895:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        -:  896:
+        1:  897:	mst_assert_uint( str->Length,   ==, p2s + 8 );
+        1:  898:	mst_assert_uint( str->Capacity, ==, (p2s+1) * 2 );
+        -:  899:
+        -:  900:	/* dodaj zaraz po "Pchnąć", automatycznie obliczając długość ciągu */
+        1:  901:	ercode = ms_string_insert_mbs( str, 6, PANGRAM2, 0 );
+        1:  902:	mst_assert( ercode == MSEC_OK );
+        -:  903:
+        1:  904:	mst_assert_uint( str->Length,         ==, p2s * 2 + 8 );
+        1:  905:	mst_assert_uint( str->MBInfo->Length, ==, p2sm * 2 + 6 );
+        1:  906:	mst_assert_uint( str->Capacity,       ==, (p2s+1) * 4 );
+        -:  907:
+        -:  908:	/* próbuj wstawić poza zakres */
+        1:  909:	ercode = ms_string_insert_mbs( str, 512, PANGRAM2, p2s );
+        1:  910:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        -:  911:
+        1:  912:	mst_assert_uint( str->Length,         ==, p2s * 2 + 8 );
+        1:  913:	mst_assert_uint( str->MBInfo->Length, ==, p2sm * 2 + 6 );
+        1:  914:	mst_assert_uint( str->Capacity,       ==, (p2s+1) * 4 );
+        -:  915:
+        -:  916:	/* sprawdź poprawność danych końcowych */
+        9:  917:	for( x = 0; x < 8; ++x )
+        8:  918:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[x] );
+       51:  919:	for( x = 8, y = 0; y < p2s; ++x, ++y )
+       50:  920:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[y] );
+       43:  921:	for( x = p2s + 8, y = 8; y < p2s; ++x, ++y )
+       42:  922:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[y] );
+        9:  923:	for( x = p2s * 2, y = 0; y < 8; ++x, ++y )
+        8:  924:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[y] );
+        -:  925:
+        -:  926:	/* sprawdź MBInfo */
+        7:  927:	for( offset = 0, x = 0; x < 6; ++x )
+        -:  928:	{
+        6:  929:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+        6:  930:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[x] );
+        6:  931:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[x] );
+        -:  932:	}
+       42:  933:	for( offset = PANGRAM2OF[x], x = 6, y = 0; y < p2sm; ++x, ++y )
+        -:  934:	{
+       41:  935:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+       41:  936:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[y] );
+       41:  937:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[y] + offset );
+        -:  938:	}
+       36:  939:	for( offset = PANGRAM2OF[y-1] + PANGRAM2MB[y-1], x = p2sm + 6, y = 6; y < p2sm; ++x, ++y )
+        -:  940:	{
+       35:  941:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+       35:  942:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[y] );
+       35:  943:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[y] + offset );
+        -:  944:	}
+        7:  945:	for( offset += PANGRAM2OF[y-1] + PANGRAM2MB[y-1], x = p2sm * 2, y = 0; y < 6; ++x, ++y )
+        -:  946:	{
+        6:  947:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+        6:  948:		mst_assert_uint( mbinfo->Bytes,  ==, PANGRAM2MB[y] );
+        6:  949:		mst_assert_uint( mbinfo->Offset, ==, PANGRAM2OF[y] + offset );
+        -:  950:	}
+        -:  951:
+        1:  952:	return MSEC_OK;
+        -:  953:}
+        -:  954:
+        1:  955:int mst_string_mbs_insert_cs( MST_FUNCTION *info )
+        -:  956:{
+        -:  957:	MSTST_STRING_DATA *data;
+        -:  958:	int                ercode;
+        -:  959:	MS_STRING         *str;
+        -:  960:
+        1:  961:	size_t p1s  = sizeof PANGRAM1 - 1;
+        1:  962:	size_t p2sm = ms_string_length_mbs( PANGRAM2, 0 );
+        1:  963:	size_t p2s  = sizeof PANGRAM2 - 1;
+        -:  964:	size_t x, y, offset;
+        -:  965:
+        1:  966:	mst_prepare( info );
+        1:  967:	data = info->Data;
+        -:  968:
+        1:  969:	str = data->Pointer2;
+        1:  970:	mst_assert( str );
+        1:  971:	mst_assert( str->Data.Char );
+        -:  972:
+        1:  973:	ms_string_clear( str );
+        1:  974:	ercode = ms_string_push_mbs( str, PANGRAM2, 0 );
+        1:  975:	mst_assert( ercode == MSEC_OK );
+        -:  976:
+        -:  977:	/* dodaj "Pack" na koniec */
+        1:  978:	ercode = ms_string_push_cs( str, PANGRAM1, 4 );
+        1:  979:	mst_assert( ercode == MSEC_OK );
+        1:  980:	mst_assert_uint( str->Length, ==, p2s + 4 );
+        -:  981:
+        -:  982:	/* próbuj wstawić coś pustego */
+        1:  983:	ercode = ms_string_insert_cs( str, 4, "", 0 );
+        1:  984:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        1:  985:	mst_assert_uint( str->Length, ==, p2s + 4 );
+        -:  986:
+        -:  987:	/* dodaj po "Pchnąć", automatycznie obliczając długość ciągu */
+        1:  988:	ercode = ms_string_insert_cs( str, 6, PANGRAM1, 0 );
+        1:  989:	mst_assert( ercode == MSEC_OK );
+        1:  990:	mst_assert_uint( str->Length, ==, p2s + 4 + p1s );
+        -:  991:
+        -:  992:	/* próbuj wstawić poza zakres */
+        1:  993:	ercode = ms_string_insert_cs( str, 512, PANGRAM1, p1s );
+        1:  994:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        1:  995:	mst_assert_uint( str->Length, ==, p2s + 4 + p1s );
+        -:  996:
+        -:  997:	/* sprawdź poprawność danych końcowych */
+        9:  998:	for( x = 0; x < 8; ++x )
+        8:  999:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[x] );
+       41: 1000:	for( x = 8, y = 0; y < p1s; ++x, ++y )
+       40: 1001:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[y] );
+       43: 1002:	for( x = p1s + 8, y = 8; y < p2s; ++x, ++y )
+       42: 1003:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM2[y] );
+        5: 1004:	for( x = p2s + p1s, y = 0; y < 4; ++x, ++y )
+        4: 1005:		mst_assert_sint( str->Data.Char[x], ==, PANGRAM1[y] );
+        -: 1006:
+        -: 1007:	/* sprawdź MBInfo */
+        7: 1008:	for( offset = 0, x = 0; x < 6; ++x )
+        -: 1009:	{
+        6: 1010:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+        6: 1011:		mst_assert( mbinfo->Bytes  == PANGRAM2MB[x] );
+        6: 1012:		mst_assert( mbinfo->Offset == PANGRAM2OF[x] );
+        -: 1013:	}
+       41: 1014:	for( offset = PANGRAM2OF[x], x = 6, y = 0; y < p1s; ++x, ++y )
+        -: 1015:	{
+       40: 1016:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+       40: 1017:		mst_assert( mbinfo->Bytes  == 1 );
+       40: 1018:		mst_assert( mbinfo->Offset == y + offset );
+        -: 1019:	}
+       36: 1020:	for( offset = y, x = p1s + 6, y = 6; y < p2sm; ++x, ++y )
+        -: 1021:	{
+       35: 1022:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+       35: 1023:		mst_assert( mbinfo->Bytes  == PANGRAM2MB[y] );
+       35: 1024:		mst_assert( mbinfo->Offset == PANGRAM2OF[y] + offset );
+        -: 1025:	}
+        5: 1026:	for( offset += PANGRAM2OF[y-1] + PANGRAM2MB[y-1], x = p2sm + p1s, y = 0; y < 4; ++x, ++y )
+        -: 1027:	{
+        4: 1028:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+        4: 1029:		mst_assert( mbinfo->Bytes  == 1 );
+        4: 1030:		mst_assert( mbinfo->Offset == y + offset );
+        -: 1031:	}
+        -: 1032:
+        1: 1033:	return MSEC_OK;
+        -: 1034:}
+        -: 1035:
+        1: 1036:int mst_string_mbs_insert_wcs( MST_FUNCTION *info )
+        -: 1037:{
+        -: 1038:	MSTST_STRING_DATA *data;
+        -: 1039:	int                ercode;
+        -: 1040:	MS_STRING         *str;
+        -: 1041:
+        1: 1042:	size_t p2sm = ms_string_length_mbs( PANGRAM2, 0 );
+        1: 1043:	size_t p2s  = sizeof PANGRAM2 - 1;
+        1: 1044:	size_t p3s  = sizeof PANGRAM3 - 1;
+        1: 1045:	size_t p3sm = ms_string_length_wcstombs( PANGRAM3, 0 );
+        -: 1046:	size_t x, y, offset;
+        -: 1047:
+        1: 1048:	mst_prepare( info );
+        1: 1049:	data = info->Data;
+        -: 1050:
+        1: 1051:	str = data->Pointer2;
+        1: 1052:	mst_assert( str );
+        1: 1053:	mst_assert( str->Data.Char );
+        -: 1054:
+        1: 1055:	ms_string_clear( str );
+        1: 1056:	ercode = ms_string_push_mbs( str, PANGRAM2, 0 );
+        1: 1057:	mst_assert( ercode == MSEC_OK );
+        -: 1058:
+        -: 1059:	/* dodaj "Pchnąć" na koniec */
+        1: 1060:	ercode = ms_string_push_wcs( str, PANGRAM3, 6 );
+        1: 1061:	mst_assert( ercode == MSEC_OK );
+        1: 1062:	mst_assert_uint( str->Length, ==, p2s + 8 );
+        -: 1063:
+        -: 1064:	/* próbuj wstawić coś pustego */
+        1: 1065:	ercode = ms_string_insert_wcs( str, 4, L"", 0 );
+        1: 1066:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        1: 1067:	mst_assert_uint( str->Length, ==, p2s + 8 );
+        -: 1068:
+        -: 1069:	/* dodaj po "Pchnąć", automatycznie obliczając długość ciągu */
+        1: 1070:	ercode = ms_string_insert_wcs( str, 8, PANGRAM3, 0 );
+        1: 1071:	mst_assert( ercode == MSEC_OK );
+        1: 1072:	mst_assert_uint( str->Length, ==, p2s + 8 + p3sm );
+        -: 1073:
+        -: 1074:	/* próbuj wstawić poza zakres */
+        1: 1075:	ercode = ms_string_insert_wcs( str, 512, PANGRAM3, p3s );
+        1: 1076:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        1: 1077:	mst_assert_uint( str->Length, ==, p2s + 8 + p3sm );
+        -: 1078:
+        -: 1079:	/* sprawdź poprawność danych końcowych */
+       11: 1080:	for( x = 0; x < 10; ++x )
+       10: 1081:		mst_assert_uint( str->Data.Char[x], ==, PANGRAM2[x] );
+       51: 1082:	for( x = 10, y = 0; y < p2s; ++x, ++y )
+       50: 1083:		mst_assert_uint( str->Data.Char[x], ==, PANGRAM2[y] );
+       41: 1084:	for( x = p2s + 10, y = 10; y < p2s; ++x, ++y )
+       40: 1085:		mst_assert_uint( str->Data.Char[x], ==, PANGRAM2[y] );
+        9: 1086:	for( x = p2s * 2, y = 0; y < 8; ++x, ++y )
+        8: 1087:		mst_assert_uint( str->Data.Char[x], ==, PANGRAM2[y] );
+        -: 1088:
+        -: 1089:	/* sprawdź MBInfo */
+        9: 1090:	for( offset = 0, x = 0; x < 8; ++x )
+        -: 1091:	{
+        8: 1092:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+        8: 1093:		mst_assert_sint( mbinfo->Bytes,  ==, PANGRAM2MB[x] );
+        8: 1094:		mst_assert_sint( mbinfo->Offset, ==, PANGRAM2OF[x] );
+        -: 1095:	}
+       42: 1096:	for( offset = PANGRAM2OF[x], x = 8, y = 0; y < p2sm; ++x, ++y )
+        -: 1097:	{
+       41: 1098:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+       41: 1099:		mst_assert_sint( mbinfo->Bytes,  ==, PANGRAM2MB[y] );
+       41: 1100:		mst_assert_sint( mbinfo->Offset, ==, PANGRAM2OF[y] + offset );
+        -: 1101:	}
+       34: 1102:	for( offset = PANGRAM2OF[y-1] + PANGRAM2MB[y-1], x = p2sm + 8, y = 8; y < p2sm; ++x, ++y )
+        -: 1103:	{
+       33: 1104:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+       33: 1105:		mst_assert_sint( mbinfo->Bytes,  ==, PANGRAM2MB[y] );
+       33: 1106:		mst_assert_sint( mbinfo->Offset, ==, PANGRAM2OF[y] + offset );
+        -: 1107:	}
+        7: 1108:	for( offset += PANGRAM2OF[y-1] + PANGRAM2MB[y-1], x = p2sm * 2, y = 0; y < 6; ++x, ++y )
+        -: 1109:	{
+        6: 1110:		MS_MBINFO *mbinfo = &ms_array_get(str->MBInfo, MS_MBINFO, x);
+        6: 1111:		mst_assert_sint( mbinfo->Bytes,  ==, PANGRAM2MB[y] );
+        6: 1112:		mst_assert_sint( mbinfo->Offset, ==, PANGRAM2OF[y] + offset );
+        -: 1113:	}
+        -: 1114:
+        1: 1115:	return MSEC_OK;
+        -: 1116:}
+        -: 1117:
+        1: 1118:int mst_string_wcs_insert_wcs( MST_FUNCTION *info )
+        -: 1119:{
+        -: 1120:	MSTST_STRING_DATA *data;
+        -: 1121:	int                ercode;
+        -: 1122:	MS_STRING         *str;
+        -: 1123:
+        1: 1124:	size_t p3s = sizeof PANGRAM3 / sizeof(wchar_t) - 1;
+        -: 1125:	size_t x, y;
+        -: 1126:
+        1: 1127:	mst_prepare( info );
+        1: 1128:	data = info->Data;
+        1: 1129:	mst_assert( !data->Pointer3 );
+        -: 1130:
+        -: 1131:	/* przypadek 1 - wstawiany ciąg znaków jest ciągiem znaków wchar_t */
+        1: 1132:	str = data->Pointer3 = ms_string_alloc_wcs( PANGRAM3, 0 );
+        1: 1133:	mst_assert( str );
+        1: 1134:	mst_assert( str->Data.Char );
+        -: 1135:
+        -: 1136:	/* dodaj "Pchnąć" na koniec */
+        1: 1137:	ercode = ms_string_push_wcs( str, PANGRAM3, 6 );
+        1: 1138:	mst_assert( ercode == MSEC_OK );
+        -: 1139:
+        1: 1140:	mst_assert_uint( str->Length,   ==, p3s + 6 );
+        1: 1141:	mst_assert_uint( str->Capacity, ==, (p3s+1) * 2 );
+        -: 1142:
+        -: 1143:	/* próbuj wstawić coś pustego */
+        1: 1144:	ercode = ms_string_insert_wcs( str, 4, L"", 0 );
+        1: 1145:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        -: 1146:
+        1: 1147:	mst_assert_uint( str->Length,   ==, p3s + 6 );
+        1: 1148:	mst_assert_uint( str->Capacity, ==, p3s * 2 + 2 );
+        -: 1149:
+        -: 1150:	/* dodaj po "Pchnąć", automatycznie obliczając długość ciągu */
+        1: 1151:	ercode = ms_string_insert_wcs( str, 6, PANGRAM3, 0 );
+        1: 1152:	mst_assert( ercode == MSEC_OK );
+        -: 1153:
+        1: 1154:	mst_assert_uint( str->Length,   ==, p3s * 2 + 6 );
+        1: 1155:	mst_assert_uint( str->Capacity, ==, (p3s+1) * 4 );
+        -: 1156:
+        -: 1157:	/* próbuj wstawić poza zakres */
+        1: 1158:	ercode = ms_string_insert_wcs( str, 512, PANGRAM3, p3s );
+        1: 1159:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        -: 1160:
+        1: 1161:	mst_assert_uint( str->Length,   ==, p3s * 2 + 6 );
+        1: 1162:	mst_assert_uint( str->Capacity, ==, (p3s+1) * 4 );
+        -: 1163:
+        -: 1164:	/* sprawdź poprawność danych końcowych */
+        7: 1165:	for( x = 0; x < 6; ++x )
+        6: 1166:		mst_assert( str->Data.Wide[x] == PANGRAM3[x] );
+       42: 1167:	for( x = 6, y = 0; y < p3s; ++x, ++y )
+       41: 1168:		mst_assert( str->Data.Wide[x] == PANGRAM3[y] );
+       36: 1169:	for( x = p3s + 6, y = 6; y < p3s; ++x, ++y )
+       35: 1170:		mst_assert( str->Data.Wide[x] == PANGRAM3[y] );
+        7: 1171:	for( x = p3s + p3s, y = 0; y < 6; ++x, ++y )
+        6: 1172:		mst_assert( str->Data.Wide[x] == PANGRAM3[y] );
+        -: 1173:
+        1: 1174:	return MSEC_OK;
+        -: 1175:}
+        -: 1176:
+        1: 1177:int mst_string_wcs_insert_cs( MST_FUNCTION *info )
+        -: 1178:{
+        -: 1179:	MSTST_STRING_DATA *data;
+        -: 1180:	int                ercode;
+        -: 1181:	MS_STRING         *str;
+        -: 1182:
+        1: 1183:	size_t p1s = sizeof PANGRAM1 - 1;
+        1: 1184:	size_t p3s = sizeof PANGRAM3 / sizeof(wchar_t) - 1;
+        -: 1185:	size_t x, y;
+        -: 1186:
+        1: 1187:	mst_prepare( info );
+        1: 1188:	data = info->Data;
+        -: 1189:
+        1: 1190:	str = data->Pointer3;
+        1: 1191:	mst_assert( str );
+        1: 1192:	mst_assert( str->Data.Char );
+        -: 1193:
+        1: 1194:	ms_string_clear( str );
+        1: 1195:	ercode = ms_string_push_wcs( str, PANGRAM3, 0 );
+        1: 1196:	mst_assert( ercode == MSEC_OK );
+        -: 1197:
+        -: 1198:	/* dodaj "Pack" na koniec */
+        1: 1199:	ercode = ms_string_push_cs( str, PANGRAM1, 4 );
+        1: 1200:	mst_assert( ercode == MSEC_OK );
+        1: 1201:	mst_assert_uint( str->Length, ==, p3s + 4 );
+        -: 1202:
+        -: 1203:	/* próbuj wstawić coś pustego */
+        1: 1204:	ercode = ms_string_insert_cs( str, 4, "", 0 );
+        1: 1205:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        1: 1206:	mst_assert_uint( str->Length, ==, p3s + 4 );
+        -: 1207:
+        -: 1208:	/* dodaj po "Pchnąć", automatycznie obliczając długość ciągu */
+        1: 1209:	ercode = ms_string_insert_cs( str, 6, PANGRAM1, 0 );
+        1: 1210:	mst_assert( ercode == MSEC_OK );
+        1: 1211:	mst_assert_uint( str->Length, ==, p3s + 4 + p1s );
+        -: 1212:
+        -: 1213:	/* próbuj wstawić poza zakres */
+        1: 1214:	ercode = ms_string_insert_cs( str, 512, PANGRAM1, p1s );
+        1: 1215:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        1: 1216:	mst_assert_uint( str->Length, ==, p3s + 4 + p1s );
+        -: 1217:
+        -: 1218:	/* sprawdź poprawność danych końcowych */
+        7: 1219:	for( x = 0; x < 6; ++x )
+        6: 1220:		mst_assert_sint( str->Data.Wide[x], ==, PANGRAM3[x] );
+       41: 1221:	for( x = 6, y = 0; y < p1s; ++x, ++y )
+       40: 1222:		mst_assert_sint( str->Data.Wide[x], ==, (wchar_t)PANGRAM1[y] );
+       36: 1223:	for( x = p1s + 6, y = 6; y < p3s; ++x, ++y )
+       35: 1224:		mst_assert_sint( str->Data.Wide[x], ==, PANGRAM3[y] );
+        5: 1225:	for( x = p1s + p3s, y = 0; y < 4; ++x, ++y )
+        4: 1226:		mst_assert_sint( str->Data.Wide[x], ==, (wchar_t)PANGRAM1[y] );
+        -: 1227:
+        1: 1228:	return MSEC_OK;
+        -: 1229:}
+        -: 1230:
+        1: 1231:int mst_string_wcs_insert_mbs( MST_FUNCTION *info )
+        -: 1232:{
+        -: 1233:	MSTST_STRING_DATA *data;
+        -: 1234:	int                ercode;
+        -: 1235:	MS_STRING         *str;
+        -: 1236:
+        1: 1237:	size_t p2s = ms_string_length_mbs( PANGRAM2, 0 );
+        1: 1238:	size_t p3s = sizeof PANGRAM3 / sizeof(wchar_t) - 1;
+        -: 1239:	size_t x, y;
+        -: 1240:
+        1: 1241:	mst_prepare( info );
+        1: 1242:	data = info->Data;
+        -: 1243:
+        1: 1244:	str = data->Pointer3;
+        1: 1245:	mst_assert( str );
+        1: 1246:	mst_assert( str->Data.Char );
+        -: 1247:
+        1: 1248:	ms_string_clear( str );
+        1: 1249:	ercode = ms_string_push_wcs( str, PANGRAM3, 0 );
+        1: 1250:	mst_assert( ercode == MSEC_OK );
+        -: 1251:
+        -: 1252:	/* powinien być błąd - ostatni znak nie jest pełny */
+        1: 1253:	ercode = ms_string_push_mbs( str, PANGRAM2, 5 );
+        1: 1254:	mst_assert( ercode == MSEC_INVALID_VALUE );
+        1: 1255:	mst_assert_uint( str->Length, ==, p3s );
+        -: 1256:
+        -: 1257:	/* teraz powinno dodać - "Pchnąć" */
+        1: 1258:	ercode = ms_string_push_mbs( str, PANGRAM2, 8 );
+        1: 1259:	mst_assert( ercode == MSEC_OK );
+        1: 1260:	mst_assert_uint( str->Length, ==, p3s + 6 );
+        -: 1261:
+        -: 1262:	/* próbuj wstawić coś pustego
+        -: 1263:	   przy sprawdzaniu jest + 6, gdyż wstawiono 6 znaków znajdujących się na 8 bajtach */
+        1: 1264:	ercode = ms_string_insert_mbs( str, 4, "", 0 );
+        1: 1265:	mst_assert( ercode == MSEC_INVALID_ARGUMENT );
+        1: 1266:	mst_assert_uint( str->Length, ==, p3s + 6 );
+        -: 1267:
+        -: 1268:	/* dodaj po "Pchnąć", automatycznie obliczając długość ciągu */
+        1: 1269:	ercode = ms_string_insert_mbs( str, 6, PANGRAM2, 0 );
+        1: 1270:	mst_assert( ercode == MSEC_OK );
+        1: 1271:	mst_assert_uint( str->Length, ==, p2s + p3s + 6 );
+        -: 1272:
+        -: 1273:	/* próbuj wstawić poza zakres */
+        1: 1274:	ercode = ms_string_insert_mbs( str, 512, PANGRAM2, sizeof PANGRAM2 - 1 );
+        1: 1275:	mst_assert( ercode == MSEC_OUT_OF_RANGE );
+        1: 1276:	mst_assert_uint( str->Length, ==, p2s + p3s + 6 );
+        -: 1277:
+        -: 1278:	/* sprawdź poprawność danych końcowych */
+        7: 1279:	for( x = 0; x < 6; ++x )
+        6: 1280:		mst_assert_sint( str->Data.Wide[x], ==, PANGRAM3[x] );
+       42: 1281:	for( x = 6, y = 0; y < p2s; ++x, ++y )
+       41: 1282:		mst_assert_sint( str->Data.Wide[x], ==, PANGRAM3[y] );
+       36: 1283:	for( x = p2s + 6, y = 6; y < p3s; ++x, ++y )
+       35: 1284:		mst_assert_sint( str->Data.Wide[x], ==, PANGRAM3[y] );
+        7: 1285:	for( x = p2s + p3s, y = 0; y < 6; ++x, ++y )
+        6: 1286:		mst_assert_sint( str->Data.Wide[x], ==, PANGRAM3[y] );
+        -: 1287:
+        1: 1288:	return MSEC_OK;
+        -: 1289:}
+        -: 1290:
+        -: 1291:/*
+        -: 1292:======================================================================================================================
+        -: 1293:------------------------------------------------------------------------------------------------------------------
+        -: 1294:	URUCHAMIANIE TESTÓW
+        -: 1295:------------------------------------------------------------------------------------------------------------------
+        -: 1296:======================================================================================================================
+        -: 1297:*/
+        -: 1298:
+        -: 1299:/**
+        -: 1300: * Opisy funkcji testujących.
+        -: 1301: * Wyświetlane są zaraz pod nazwą funkcji podczas testowania.
+        -: 1302: * Uporzadkowane w kolejności rozmieszczenia funkcji w liście.
+        -: 1303: */
+        -: 1304:#define FUNC_DESC_01 "Count characters in multibyte string."
+        -: 1305:#define FUNC_DESC_02 "Check length of string after wcstombs conversion."
+        -: 1306:#define FUNC_DESC_03 "Get info about each multibyte character in string."
+        -: 1307:#define FUNC_DESC_04 "Get info about each character in string after wcstombs conversion."
+        -: 1308:#define FUNC_DESC_05 "Create single byte string by alloc, init and return."
+        -: 1309:#define FUNC_DESC_06 "Create multibyte string by alloc, init and return."
+        -: 1310:#define FUNC_DESC_07 "Create wide string by alloc, init and return."
+        -: 1311:#define FUNC_DESC_08 "Free memory allocated for string in constructors."
+        -: 1312:#define FUNC_DESC_09 "Change string capacity by using simple realloc version."
+        -: 1313:#define FUNC_DESC_10 "Change string capacity by using minimum realloc version."
+        -: 1314:#define FUNC_DESC_11 "Insert single byte string into single byte string."
+        -: 1315:#define FUNC_DESC_12 "Insert multibyte string into single byte string."
+        -: 1316:#define FUNC_DESC_13 "Insert wide string into single byte string."
+        -: 1317:#define FUNC_DESC_14 "Insert multibyte string into multibyte string."
+        -: 1318:#define FUNC_DESC_15 "Insert single byte string into multibyte string."
+        -: 1319:#define FUNC_DESC_16 "Insert wide string into multibyte string."
+        -: 1320:#define FUNC_DESC_17 "Insert wide string into wide string."
+        -: 1321:#define FUNC_DESC_18 "Insert single byte string into wide string."
+        -: 1322:#define FUNC_DESC_19 "Insert multibyte string into wide string."
+        -: 1323:
+        -: 1324:/**
+        -: 1325: * Lista funkcji testujących moduł.
+        -: 1326: * Każda z osobna uruchamiana jest przez odpowiednią funkcję.
+        -: 1327: * Dzięki zbiorowi funkcji zdefiniowanemu poniżej dzieje się to automatycznie.
+        -: 1328: */
+        -: 1329:MST_FUNCTION MSV_StringSuiteFunctions[] =
+        -: 1330:{
+        -: 1331:	{ MST_STRINGIFY(mst_string_length_mbs),      FUNC_DESC_01, NULL },
+        -: 1332:	{ MST_STRINGIFY(mst_string_length_wcstombs), FUNC_DESC_02, NULL },
+        -: 1333:	{ MST_STRINGIFY(mst_string_info_mbs),        FUNC_DESC_03, NULL },
+        -: 1334:	{ MST_STRINGIFY(mst_string_info_wcstombs),   FUNC_DESC_04, NULL },
+        -: 1335:	{ MST_STRINGIFY(mst_string_create_cs),       FUNC_DESC_05, NULL },
+        -: 1336:	{ MST_STRINGIFY(mst_string_create_mbs),      FUNC_DESC_06, NULL },
+        -: 1337:	{ MST_STRINGIFY(mst_string_create_wcs),      FUNC_DESC_07, NULL },
+        -: 1338:	{ MST_STRINGIFY(mst_string_destroy),         FUNC_DESC_08, NULL },
+        -: 1339:	{ MST_STRINGIFY(mst_string_realloc),         FUNC_DESC_09, NULL },
+        -: 1340:	{ MST_STRINGIFY(mst_string_realloc_min),     FUNC_DESC_10, NULL },
+        -: 1341:	{ MST_STRINGIFY(mst_string_cs_insert_cs),    FUNC_DESC_11, NULL },
+        -: 1342:	{ MST_STRINGIFY(mst_string_cs_insert_mbs),   FUNC_DESC_12, NULL },
+        -: 1343:	{ MST_STRINGIFY(mst_string_cs_insert_wcs),   FUNC_DESC_13, NULL },
+        -: 1344:	{ MST_STRINGIFY(mst_string_mbs_insert_mbs),  FUNC_DESC_15, NULL },
+        -: 1345:	{ MST_STRINGIFY(mst_string_mbs_insert_cs),   FUNC_DESC_14, NULL },
+        -: 1346:	{ MST_STRINGIFY(mst_string_mbs_insert_wcs),  FUNC_DESC_16, NULL },
+        -: 1347:	{ MST_STRINGIFY(mst_string_wcs_insert_wcs),  FUNC_DESC_19, NULL },
+        -: 1348:	{ MST_STRINGIFY(mst_string_wcs_insert_cs),   FUNC_DESC_17, NULL },
+        -: 1349:	{ MST_STRINGIFY(mst_string_wcs_insert_mbs),  FUNC_DESC_18, NULL },
+        -: 1350:	{ MST_LASTRECORD }
+        -: 1351:};
+        -: 1352:
+        -: 1353:/**
+        -: 1354: * Zbiór funkcji testujących moduł.
+        -: 1355: * Przekazywany do funkcji main, pozwala na uruchomienie wszystkich testów.
+        -: 1356: */
+        -: 1357:MST_SUITE MSV_StringSuite =
+        -: 1358:{
+        -: 1359:	">>> STRING MODULE",
+        -: 1360:	TRUE,
+        -: 1361:	NULL,
+        -: 1362:	mst_string_teardown,
+        -: 1363:	NULL,
+        -: 1364:	MSV_StringSuiteFunctions
+        -: 1365:};
+        -: 1366:
+        -: 1367:/* w przypadku wszystkich zestawów na raz nie dołączaj funkcji main */
+        -: 1368:#ifndef MST_ALL_SUITES
+        -: 1369:
+        -: 1370:	/**
+        -: 1371:	 * Funkcja główna dołączana tylko przy uruchomieniu tego testu.
+        -: 1372:	 * W przypadku testowania wszystkich modułów na raz, nie jest uwzględniana w kompilacji.
+        -: 1373:	 * 
+        -: 1374:	 * @param argc Ilość parametrów przekazywanych do programu.
+        -: 1375:	 * @param argv Parametry przekazane do programu z wiersza poleceń.
+        -: 1376:	 * 
+        -: 1377:	 * @return Kod błędu lub wartość 0.
+        -: 1378:	 */
+        1: 1379:	int main( int argc, char **argv )
+        -: 1380:	{
+        1: 1381:		MSTST_STRING_DATA data = { NULL, NULL, NULL };
+        -: 1382:
+        1: 1383:		setlocale( LC_ALL, "pl_PL.utf8" );
+        -: 1384:
+        -: 1385:		IGVAR argc;
+        -: 1386:		IGVAR argv;
+        -: 1387:
+        -: 1388:		/* przypisz dane do zbioru */
+        1: 1389:		MSV_StringSuite.Data = &data;
+        -: 1390:
+        1: 1391:		return mst_run_suite( &MSV_StringSuite );
+        -: 1392:	}
+        -: 1393:
+        -: 1394:#endif

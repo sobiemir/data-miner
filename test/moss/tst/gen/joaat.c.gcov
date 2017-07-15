@@ -1,0 +1,119 @@
+        -:    0:Source:../../src/hash/joaat.c
+        -:    0:Programs:7
+        -:    1:/*
+        -:    2: *  Moss Library >>> http://moss.aculo.pl
+        -:    3: *
+        -:    4: *     /'\_/`\                           
+        -:    5: *    /\      \    ___     ____    ____  
+        -:    6: *    \ \ \__\ \  / __`\  /',__\  /',__\ 
+        -:    7: *     \ \ \_/\ \/\ \L\ \/\__, `\/\__, `\
+        -:    8: *      \ \_\\ \_\ \____/\/\____/\/\____/
+        -:    9: *       \/_/ \/_/\/___/  \/___/  \/___/ 
+        -:   10: *
+        -:   11: *  Source file for "Hash" module, JoaaT algorithm [Public Domain].
+        -:   12: *  All modifications are based on GPLv3 license.
+        -:   13: *  
+        -:   14: *  This file is part of Moss Library
+        -:   15: *  Copyright (c) by sobiemir <sobiemir@aculo.pl>
+        -:   16: *
+        -:   17: *  This program is free software: you can redistribute it and/or modify
+        -:   18: *  it under the terms of the GNU General Public License as published by
+        -:   19: *  the Free Software Foundation, either version 3 of the License, or
+        -:   20: *  (at your option) any later version.
+        -:   21: *
+        -:   22: *  This program is distributed in the hope that it will be useful,
+        -:   23: *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+        -:   24: *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        -:   25: *  GNU General Public License for more details.
+        -:   26: *
+        -:   27: *  You should have received a copy of the GNU General Public License
+        -:   28: *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+        -:   29: */
+        -:   30:
+        -:   31:#include <moss/hash.h>
+        -:   32:
+        -:   33:#ifdef MSD_COMPILER_MSC
+        -:   34:	__pragma( warning(push) )
+        -:   35:	__pragma( warning(disable:4127))    /* conditional expression is constant */
+        -:   36:#endif
+        -:   37:
+        -:   38:/* ================================================================================================================== */
+        -:   39:
+        2:   40:uint32_t ms_hash_32_joaat( const void *data, size_t length )
+        -:   41:{
+        2:   42:	uint32_t    hash = 0;
+        2:   43:	const char *cdat = data;
+        -:   44:
+        2:   45:	assert( data );
+        -:   46:
+       42:   47:	for( ; length; --length )
+       40:   48:		hash += *cdat++,
+       40:   49:		hash += hash << 10,
+       40:   50:		hash ^= hash >> 6;
+        -:   51:
+        2:   52:	hash += hash << 3;
+        2:   53:	hash ^= hash >> 11;
+        2:   54:	hash += hash << 15;
+        -:   55:
+        2:   56:	return hash;
+        -:   57:}
+        -:   58:
+        -:   59:#ifdef MSD_HASH_MBS_FUNCTIONS
+        -:   60:
+        -:   61:/* ================================================================================================================== */
+        -:   62:
+        1:   63:uint32_t ms_hash_mbs_32_joaat( const char *data )
+        -:   64:{
+        1:   65:	uint32_t hash = 0;
+        -:   66:	int      c;
+        -:   67:
+        1:   68:	assert( data );
+        -:   69:
+       10:   70:	while( (c = (uint8_t)*data++) != 0 )
+        8:   71:		(hash += c), (hash += hash << 10), (hash ^= hash >> 6);
+        -:   72:
+        1:   73:	hash += hash << 3;
+        1:   74:	hash ^= hash >> 11;
+        1:   75:	hash += hash << 15;
+        -:   76:
+        1:   77:	return hash;
+        -:   78:}
+        -:   79:
+        -:   80:#endif
+        -:   81:#ifdef MSD_HASH_WCS_FUNCTIONS
+        -:   82:
+        -:   83:/* ================================================================================================================== */
+        -:   84:
+        1:   85:uint32_t ms_hash_wcs_32_joaat( const wchar_t *data )
+        -:   86:{
+        1:   87:	uint32_t hash = 0;
+        -:   88:	wint_t   c;
+        -:   89:
+        1:   90:	assert( data );
+        -:   91:
+        -:   92:	/* 2 bajtowy wchar_t */
+        -:   93:	if( sizeof(wchar_t) == 2 )
+        -:   94:		while( (c = (uint16_t)*data++) != 0 )
+        -:   95:			hash += ((uint32_t)(c & 0x00FF)     ), (hash += hash << 10), (hash ^= hash >> 6),
+        -:   96:			hash += ((uint32_t)(c & 0xFF00) >> 8), (hash += hash << 10), (hash ^= hash >> 6);
+        -:   97:
+        -:   98:	/* 4 bajtowy wchar_t */
+        -:   99:	else if( sizeof(wchar_t) == 4 )
+       10:  100:	while( (c = (uint32_t)*data++) != 0 )
+        8:  101:		hash += ((uint32_t)(c & 0x000000FF)      ), (hash += hash << 10), (hash ^= hash >> 6),
+        8:  102:		hash += ((uint32_t)(c & 0x0000FF00) >> 8 ), (hash += hash << 10), (hash ^= hash >> 6),
+        8:  103:		hash += ((uint32_t)(c & 0x00FF0000) >> 16), (hash += hash << 10), (hash ^= hash >> 6),
+        8:  104:		hash += ((uint32_t)(c & 0xFF000000) >> 24), (hash += hash << 10), (hash ^= hash >> 6);
+        -:  105:
+        1:  106:	hash += hash << 3;
+        1:  107:	hash ^= hash >> 11;
+        1:  108:	hash += hash << 15;
+        -:  109:
+        1:  110:	return hash;
+        -:  111:}
+        -:  112:
+        -:  113:#endif
+        -:  114:#ifdef MSD_COMPILER_MSC
+        -:  115:	__pragma( warning(pop) )
+        -:  116:#endif
+        -:  117:

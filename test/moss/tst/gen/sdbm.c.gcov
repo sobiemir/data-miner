@@ -1,0 +1,101 @@
+        -:    0:Source:../../src/hash/sdbm.c
+        -:    0:Programs:7
+        -:    1:/*
+        -:    2: *  Moss Library >>> http://moss.aculo.pl
+        -:    3: *
+        -:    4: *     /'\_/`\                           
+        -:    5: *    /\      \    ___     ____    ____  
+        -:    6: *    \ \ \__\ \  / __`\  /',__\  /',__\ 
+        -:    7: *     \ \ \_/\ \/\ \L\ \/\__, `\/\__, `\
+        -:    8: *      \ \_\\ \_\ \____/\/\____/\/\____/
+        -:    9: *       \/_/ \/_/\/___/  \/___/  \/___/ 
+        -:   10: *
+        -:   11: *  Source file for "Hash" module, SDBM algorithm [Public Domain].
+        -:   12: *  All modifications are based on GPLv3 license.
+        -:   13: *  
+        -:   14: *  This file is part of Moss Library
+        -:   15: *  Copyright (c) by sobiemir <sobiemir@aculo.pl>
+        -:   16: *
+        -:   17: *  This program is free software: you can redistribute it and/or modify
+        -:   18: *  it under the terms of the GNU General Public License as published by
+        -:   19: *  the Free Software Foundation, either version 3 of the License, or
+        -:   20: *  (at your option) any later version.
+        -:   21: *
+        -:   22: *  This program is distributed in the hope that it will be useful,
+        -:   23: *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+        -:   24: *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        -:   25: *  GNU General Public License for more details.
+        -:   26: *
+        -:   27: *  You should have received a copy of the GNU General Public License
+        -:   28: *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+        -:   29: */
+        -:   30:
+        -:   31:#include <moss/hash.h>
+        -:   32:
+        -:   33:#ifdef MSD_COMPILER_MSC
+        -:   34:	__pragma( warning(push) )
+        -:   35:	__pragma( warning(disable:4127))    /* conditional expression is constant */
+        -:   36:#endif
+        -:   37:
+        -:   38:/* ================================================================================================================== */
+        -:   39:
+        2:   40:uint32_t ms_hash_32_sdbm( const void *data, size_t length )
+        -:   41:{
+        2:   42:	uint32_t       hash = 0;
+        2:   43:	const uint8_t *cdat = data;
+        -:   44:
+        2:   45:	assert( data );
+        -:   46:
+       37:   47:	for( ; length; --length )
+       35:   48:		hash = *cdat++ + (hash << 6) + (hash << 16) - hash;
+        -:   49:
+        2:   50:	return hash;
+        -:   51:}
+        -:   52:
+        -:   53:#ifdef MSD_HASH_MBS_FUNCTIONS
+        -:   54:
+        -:   55:/* ================================================================================================================== */
+        -:   56:
+        1:   57:uint32_t ms_hash_mbs_32_sdbm( const char *data )
+        -:   58:{
+        1:   59:	uint32_t hash = 0;
+        -:   60:	int      c;
+        -:   61:
+        1:   62:	assert( data );
+        -:   63:
+        9:   64:	while( (c = (uint8_t)*data++) != 0 )
+        7:   65:		hash = c + (hash << 6) + (hash << 16) - hash;
+        -:   66:
+        1:   67:	return hash;
+        -:   68:}
+        -:   69:
+        -:   70:#endif
+        -:   71:#ifdef MSD_HASH_WCS_FUNCTIONS
+        -:   72:
+        -:   73:/* ================================================================================================================== */
+        -:   74:
+        1:   75:uint32_t ms_hash_wcs_32_sdbm( const wchar_t *data )
+        -:   76:{
+        1:   77:	uint32_t hash = 0;
+        -:   78:	wint_t   c;
+        -:   79:
+        1:   80:	assert( data );
+        -:   81:
+        -:   82:	if( sizeof(wchar_t) == 2 )
+        -:   83:		while( (c = (uint16_t)*data++) != 0 )
+        -:   84:			hash = ((uint32_t)(c & 0x00FF)     ) + (hash << 6) + (hash << 16) - hash,
+        -:   85:			hash = ((uint32_t)(c & 0xFF00) >> 8) + (hash << 6) + (hash << 16) - hash;
+        -:   86:	else if( sizeof(wchar_t) == 4 )
+        9:   87:		while( (c = (uint32_t)*data++) != 0 )
+        7:   88:			hash = ((uint32_t)(c & 0x000000FF)      ) + (hash << 6) + (hash << 16) - hash,
+        7:   89:			hash = ((uint32_t)(c & 0x0000FF00) >> 8 ) + (hash << 6) + (hash << 16) - hash,
+        7:   90:			hash = ((uint32_t)(c & 0x00FF0000) >> 16) + (hash << 6) + (hash << 16) - hash,
+        7:   91:			hash = ((uint32_t)(c & 0xFF000000) >> 24) + (hash << 6) + (hash << 16) - hash;
+        -:   92:
+        1:   93:	return hash;
+        -:   94:}
+        -:   95:
+        -:   96:#endif
+        -:   97:#ifdef MSD_COMPILER_MSC
+        -:   98:	__pragma( warning(pop) )
+        -:   99:#endif

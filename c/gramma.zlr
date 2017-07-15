@@ -1,0 +1,198 @@
+
+#ENTRY
+	\WHITESPACE
+	\CHAR
+		\CASE #
+			\THEN MACRO
+		\CASE /
+			\THEN COMMENT
+	\GOTO SYMBOL
+
+#MACRO
+	\WHITESPACE
+	\STRING [a-z]+
+		\CASE include
+			\THEN MACRO_INCLUDE
+		\CASE define
+			\THEN MACRO_DEFINE
+	\GOTO SKIP_LINE
+
+#MACRO_INCLUDE
+	\WHITESPACE
+	\CHAR
+		\CASE "
+			\THEN MACRO_INCLUDE_FILE
+		\CASE <
+			\THEN MACRO_INCLUDE_FILE
+	\GOTO SKIP_LINE
+
+#MACRO_DEFINE
+	\WHITESPACE
+	\CAPTURE 
+
+% #MACRO_INCLUDE
+% 	% znak początkowy - musi być pierwszym znakiem w linii
+% 	\FIRST
+% 	\CHAR #
+	
+% 	% po nim musi wystąpić słowo kluczowe include
+% 	% może być oddzielone od znaku początkowego białym znakiem
+% 	\WHITESPACE
+% 	\STRING include
+
+% 	% kolejny znak który musi wystąpić
+% 	\WHITESPACE
+% 	\CHAR "<
+
+% 	% regex pobierający nazwę lub dane
+% 	\REGEX [^">]+
+
+% 	% znak końcowy makra
+% 	% w przypadku podania kilku znaków stosowany jest OR CHAR[0] || CHAR[1]
+% 	\CHAR ">
+
+#GET_MACRO
+	% znak początkowy - musi być pierwszym znakiem w linii
+	\FIRST
+	\CHAR #
+
+	% po nim mogą wystąpić białe znaki
+	\WHITESPACE
+
+	% następnie wykonaj odpowiednią akcję
+	\IF:STRING include
+		\GOTO MACRO_INCLUDE
+	\ELSIF:STRING define
+		\GOTO MACRO_DEFINE
+	\ELSE
+		\GOTO SKIP_CONTENT
+
+#MACRO_INCLUDE
+	% przesuń pozycję o ostatnio sprawdzaną wartość (include)
+	\SHIFTPOS
+	\WHITESPACE
+	\CHAR "<
+	\CAPTURE [^">]+
+	\CHAR ">
+
+#MACRO_DEFINE
+	\SHIFTPOS
+	\WHITESPACE
+	\CAPTURE [a-zA-Z$_][0-9a-zA-Z$_]*
+
+	\GOTO MACRO_ARGUMENTS
+	\GOTO SKIP_CONTENT
+
+#MACRO_ARGUMENTS
+	% argumenty muszą się rozpoczynać od znaku (
+	\CHAR (
+	% pomiędzy argumentami a separatorem mogą być spacje
+	\WHITESPACE
+	% rozdziel kolejne argumenty separatorem
+	\SEPARATOR ,
+	% dla każdej grupy rozdzielanej separatorem dopasuj następujący ciąg
+	\EACH_CAPTURE [a-zA-Z$_][0-9a-zA-Z$_]*
+	% i kończyć znakiem )
+	\CHAR )
+
+#MACRO_CONTENT_SKIP
+	\SKIP
+	\ESCAPE \
+	\CHAR \r\n
+
+@INCLUDE_REGEX
+
+	% #include
+	[\s]*\#[\s]*include[\s]+
+	(?:
+		% umieszczone w nawiasach ostrych (chevrons)
+		(?:<([^>]+)>)
+		|
+		% umieszczone w powdójnych apostrofach
+		(?:"([^"]+)")
+	)
+
+@DEFINE_REGEX
+
+	% #define
+	[\s]*\#[\s]*define[\s]+
+	% nazwa makra lub funkcji makra
+	([a-zA-Z_0-9$]*)
+	% nawias dla funkcji bezpośrednio po nazwie makra
+	% nie musi go być, bo makro może mieć tylko wartość
+	(?:\(
+		((?:
+			[\s]*(?:
+				% nazwa parametru
+				[a-zA-Z_0-9$]+
+				|
+				% lub trzykropek (...)
+				(?:\.\.\.)
+			% przecinek - separator argumentów
+			)[\s]*[,]?[\s]*
+		)*)
+	\))?
+	% reszta makra lub funkcji makra
+	(.*)
+
+@SYMBOL_REGEX
+
+	[\s]*((?:
+		[a-zA-Z_0-9$]*[\s]*
+	)+)
+	(?:\(
+		((?:
+			[\s]*(?:
+				[a-zA-Z_0-9$*]+
+				|
+				(?:\.\.\.)
+			)[\s]*[,]?[\s]*
+		)*)
+	\))?
+	[\s]*(=)?[\s]*
+	([^;{]*)
+	(.*)
+
+@PURE_BLOCK_COMMENT_REGEX
+
+
+
+@PURE_LINE_COMMENT_REGEX
+
+	(?:///|//)[\s]?(.*)
+
+#SCOPE_EXTRACT
+
+	\FUNCTION scope_extract
+
+#INCLUDE
+
+	\FIRST_WITHOUT_WHITE
+	\FIRST #
+	\FIRST_NEXT in
+	\REGEX ${INCLUDE_REGEX}
+
+#DEFINE
+	\FIRST_WITHOUT_WHITE
+	\FIRST #
+	\FIRST_NEXT d
+	\REGEX ${DEFINE_REGEX}
+	\MULTILINE
+
+#SYMBOL
+	\REGEX ${SYMBOL_REGEX}
+	\MULTILINE
+
+#CLEAN_LINE_COMMENT
+	\FUNCTION clean_line_comment ${PURE_LINE_COMMENT_REGEX}
+
+#CLEAN_BLOCK_COMMENT
+	\FUNCTION clean_block_comment ${PURE_BLOCK_COMMENT_REGEX}
+
+-SCOPE_EXTRACT
+:MATCH WITH
+	-INCLUDE
+	-DEFINE
+	-CLEAN_LINE_COMMENT
+	-CLEAN_BLOCK_COMMENT
+:END

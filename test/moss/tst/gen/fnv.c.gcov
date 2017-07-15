@@ -1,0 +1,328 @@
+        -:    0:Source:../../src/hash/fnv.c
+        -:    0:Programs:7
+        -:    1:/*
+        -:    2: *  Moss Library >>> http://moss.aculo.pl
+        -:    3: *
+        -:    4: *     /'\_/`\                           
+        -:    5: *    /\      \    ___     ____    ____  
+        -:    6: *    \ \ \__\ \  / __`\  /',__\  /',__\ 
+        -:    7: *     \ \ \_/\ \/\ \L\ \/\__, `\/\__, `\
+        -:    8: *      \ \_\\ \_\ \____/\/\____/\/\____/
+        -:    9: *       \/_/ \/_/\/___/  \/___/  \/___/ 
+        -:   10: *
+        -:   11: *  Source file for "Hash" module, FNV algorithms [Public Domain].
+        -:   12: *  All modifications are based on GPLv3 license.
+        -:   13: *  
+        -:   14: *  This file is part of Moss Library
+        -:   15: *  Copyright (c) by sobiemir <sobiemir@aculo.pl>
+        -:   16: *
+        -:   17: *  This program is free software: you can redistribute it and/or modify
+        -:   18: *  it under the terms of the GNU General Public License as published by
+        -:   19: *  the Free Software Foundation, either version 3 of the License, or
+        -:   20: *  (at your option) any later version.
+        -:   21: *
+        -:   22: *  This program is distributed in the hope that it will be useful,
+        -:   23: *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+        -:   24: *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        -:   25: *  GNU General Public License for more details.
+        -:   26: *
+        -:   27: *  You should have received a copy of the GNU General Public License
+        -:   28: *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+        -:   29: */
+        -:   30:
+        -:   31:#include <moss/hash.h>
+        -:   32:
+        -:   33:#ifdef MSD_COMPILER_MSC
+        -:   34:	__pragma( warning(push) )
+        -:   35:	__pragma( warning(disable:4127))    /* conditional expression is constant */
+        -:   36:#endif
+        -:   37:
+        -:   38:/* ================================================================================================================== */
+        -:   39:
+        2:   40:uint32_t ms_hash_32_fnv1( const void *data, size_t length )
+        -:   41:{
+        2:   42:	uint32_t    hash = 2166136261u;
+        2:   43:	const char *cdat = data;
+        -:   44:
+        2:   45:	assert( data );
+        -:   46:
+       62:   47:	for( ; length; --length )
+      180:   48:		hash += (hash << 1) + (hash << 4) + (hash << 7) +
+      120:   49:		        (hash << 8) + (hash << 24),
+       60:   50:		hash ^= *cdat++;
+        -:   51:
+        2:   52:	return hash;
+        -:   53:}
+        -:   54:
+        -:   55:/* ================================================================================================================== */
+        -:   56:
+        2:   57:uint32_t ms_hash_32_fnv1a( const void *data, size_t length )
+        -:   58:{
+        2:   59:	uint32_t    hash = 2166136261u;
+        2:   60:	const char *cdat = data;
+        -:   61:
+        2:   62:	assert( data );
+        -:   63:
+       62:   64:	for( ; length; --length )
+       60:   65:		hash ^= *cdat++,
+      180:   66:		hash += (hash << 1) + (hash << 4) + (hash << 7) +
+      120:   67:		        (hash << 8) + (hash << 24);
+        -:   68:
+        2:   69:	return hash;
+        -:   70:}
+        -:   71:
+        -:   72:/* ================================================================================================================== */
+        -:   73:
+        2:   74:uint64_t ms_hash_64_fnv1( const void *data, size_t length )
+        -:   75:{
+        2:   76:	uint64_t    hash = 14695981039346656037ull;
+        2:   77:	const char *cdat = data;
+        -:   78:
+        2:   79:	assert( data );
+        -:   80:
+       62:   81:	for( ; length > 0; --length )
+      180:   82:		hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+      120:   83:		        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       60:   84:		hash ^= *cdat++;
+        -:   85:
+        2:   86:	return hash;
+        -:   87:}
+        -:   88:
+        -:   89:/* ================================================================================================================== */
+        -:   90:
+        2:   91:uint64_t ms_hash_64_fnv1a( const void *data, size_t length )
+        -:   92:{
+        2:   93:	uint64_t    hash = 14695981039346656037ull;
+        2:   94:	const char *cdat = data;
+        -:   95:
+        2:   96:	assert( data );
+        -:   97:
+       62:   98:	for( ; length > 0; --length )
+       60:   99:		hash ^= *cdat++,
+      180:  100:		hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+      120:  101:		        (hash << 7ull) + (hash << 8ull) + (hash << 40ull);
+        -:  102:
+        2:  103:	return hash;
+        -:  104:}
+        -:  105:
+        -:  106:#ifdef MSD_HASH_MBS_FUNCTIONS
+        -:  107:
+        -:  108:/* ================================================================================================================== */
+        -:  109:
+        1:  110:uint32_t ms_hash_mbs_32_fnv1( const char *data )
+        -:  111:{
+        1:  112:	uint32_t hash = 2166136261u;
+        -:  113:	int      c;
+        -:  114:
+        1:  115:	assert( data );
+        -:  116:
+       14:  117:	while( (c = (uint8_t)*data++) != 0 )
+       36:  118:		hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  119:		        (hash << 8) + (hash << 24),
+       12:  120:		hash ^= c;
+        -:  121:
+        1:  122:	return hash;
+        -:  123:}
+        -:  124:
+        -:  125:/* ================================================================================================================== */
+        -:  126:
+        1:  127:uint32_t ms_hash_mbs_32_fnv1a( const char *data )
+        -:  128:{
+        1:  129:	uint32_t hash = 2166136261u;
+        -:  130:	int      c;
+        -:  131:
+        1:  132:	assert( data );
+        -:  133:
+       14:  134:	while( (c = (uint8_t)*data++) != 0 )
+       12:  135:		hash ^= c,
+       36:  136:		hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  137:		        (hash << 8) + (hash << 24);
+        -:  138:
+        1:  139:	return hash;
+        -:  140:}
+        -:  141:
+        -:  142:/* ================================================================================================================== */
+        -:  143:
+        1:  144:uint64_t ms_hash_mbs_64_fnv1( const char *data )
+        -:  145:{
+        1:  146:	uint64_t hash = 14695981039346656037ull;
+        -:  147:	int      c;
+        -:  148:
+        1:  149:	assert( data );
+        -:  150:
+       14:  151:	while( (c = (uint8_t)*data++) != 0 )
+       36:  152:		hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  153:		        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  154:		hash ^= c;
+        -:  155:
+        1:  156:	return hash;
+        -:  157:}
+        -:  158:
+        -:  159:/* ================================================================================================================== */
+        -:  160:
+        1:  161:uint64_t ms_hash_mbs_64_fnv1a( const char *data )
+        -:  162:{
+        1:  163:	uint64_t hash = 14695981039346656037ull;
+        -:  164:	int      c;
+        -:  165:
+        1:  166:	assert( data );
+        -:  167:
+       14:  168:	while( (c = (uint8_t)*data++) != 0 )
+       12:  169:		hash ^= c,
+       36:  170:		hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  171:		        (hash << 7ull) + (hash << 8ull) + (hash << 40ull);
+        -:  172:
+        1:  173:	return hash;
+        -:  174:}
+        -:  175:
+        -:  176:#endif
+        -:  177:#ifdef MSD_HASH_WCS_FUNCTIONS
+        -:  178:
+        -:  179:/* ================================================================================================================== */
+        -:  180:
+        1:  181:uint32_t ms_hash_wcs_32_fnv1( const wchar_t *data )
+        -:  182:{
+        1:  183:	uint32_t hash = 2166136261u;
+        -:  184:	wint_t   c;
+        -:  185:
+        1:  186:	assert( data );
+        -:  187:
+        -:  188:	if( sizeof(wchar_t) == 2 )
+        -:  189:		while( (c = (uint16_t)*data++) != 0 )
+        -:  190:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+        -:  191:			        (hash << 8) + (hash << 24),
+        -:  192:			hash ^= (uint32_t)(c & 0x00FF),
+        -:  193:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+        -:  194:			        (hash << 8) + (hash << 24),
+        -:  195:			hash ^= (uint32_t)(c & 0xFF00) >> 8;
+        -:  196:
+        -:  197:	else if( sizeof(wchar_t) == 4 )
+       14:  198:		while( (c = (uint32_t)*data++) != 0 )
+       36:  199:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  200:			        (hash << 8) + (hash << 24),
+       12:  201:			hash ^= (uint32_t)(c & 0x000000FF),
+       36:  202:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  203:			        (hash << 8) + (hash << 24),
+       12:  204:			hash ^= (uint32_t)(c & 0x0000FF00) >> 8,
+       36:  205:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  206:			        (hash << 8) + (hash << 24),
+       12:  207:			hash ^= (uint32_t)(c & 0x00FF0000) >> 16,
+       36:  208:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  209:			        (hash << 8) + (hash << 24),
+       12:  210:			hash ^= (uint32_t)(c & 0xFF000000) >> 24;
+        -:  211:
+        1:  212:	return hash;
+        -:  213:}
+        -:  214:
+        -:  215:/* ================================================================================================================== */
+        -:  216:
+        1:  217:uint32_t ms_hash_wcs_32_fnv1a( const wchar_t *data )
+        -:  218:{
+        1:  219:	uint32_t hash = 2166136261u;
+        -:  220:	wint_t   c;
+        -:  221:
+        1:  222:	assert( data );
+        -:  223:
+        -:  224:	if( sizeof(wchar_t) == 2 )
+        -:  225:		while( (c = (uint16_t)*data++) != 0 )
+        -:  226:			hash ^= (uint32_t)(c & 0x00FF),
+        -:  227:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+        -:  228:			        (hash << 8) + (hash << 24),
+        -:  229:			hash ^= (uint32_t)(c & 0xFF00) >> 8,
+        -:  230:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+        -:  231:			        (hash << 8) + (hash << 24);
+        -:  232:
+        -:  233:	else if( sizeof(wchar_t) == 4 )
+       14:  234:		while( (c = (uint32_t)*data++) != 0 )
+       12:  235:			hash ^= (uint32_t)(c & 0x00FF),
+       36:  236:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  237:			        (hash << 8) + (hash << 24),
+       12:  238:			hash ^= (uint32_t)(c & 0xFF00) >> 8,
+       36:  239:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  240:			        (hash << 8) + (hash << 24),
+       12:  241:			hash ^= (uint32_t)(c & 0xFF00) >> 16,
+       36:  242:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  243:			        (hash << 8) + (hash << 24),
+       12:  244:			hash ^= (uint32_t)(c & 0xFF00) >> 24,
+       36:  245:			hash += (hash << 1) + (hash << 4) + (hash << 7) +
+       24:  246:			        (hash << 8) + (hash << 24);
+        -:  247:
+        1:  248:	return hash;
+        -:  249:}
+        -:  250:
+        -:  251:/* ================================================================================================================== */
+        -:  252:
+        1:  253:uint64_t ms_hash_wcs_64_fnv1( const wchar_t *data )
+        -:  254:{
+        1:  255:	uint64_t hash = 14695981039346656037ull;
+        -:  256:	wint_t   c;
+        -:  257:
+        1:  258:	assert( data );
+        -:  259:
+        -:  260:	if( sizeof(wchar_t) == 2 )
+        -:  261:		while( (c = (uint16_t)*data++) != 0 )
+        -:  262:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+        -:  263:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+        -:  264:			hash ^= (uint32_t)(c & 0x00FF),
+        -:  265:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+        -:  266:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+        -:  267:			hash ^= (uint32_t)(c & 0xFF00) >> 8;
+        -:  268:
+        -:  269:	else if( sizeof(wchar_t) == 4 )
+       14:  270:		while( (c = (uint32_t)*data++) != 0 )
+       36:  271:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  272:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  273:			hash ^= (uint32_t)(c & 0x000000FF),
+       36:  274:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  275:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  276:			hash ^= (uint32_t)(c & 0x0000FF00) >> 8,
+       36:  277:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  278:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  279:			hash ^= (uint32_t)(c & 0x00FF0000) >> 16,
+       36:  280:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  281:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  282:			hash ^= (uint32_t)(c & 0xFF000000) >> 24;
+        -:  283:
+        1:  284:	return hash;
+        -:  285:}
+        -:  286:
+        -:  287:/* ================================================================================================================== */
+        -:  288:
+        1:  289:uint64_t ms_hash_wcs_64_fnv1a( const wchar_t *data )
+        -:  290:{
+        1:  291:	uint64_t hash = 14695981039346656037ull;
+        -:  292:	wint_t   c;
+        -:  293:
+        1:  294:	assert( data );
+        -:  295:
+        -:  296:	if( sizeof(wchar_t) == 2 )
+        -:  297:		while( (c = (uint16_t)*data++) != 0 )
+        -:  298:			hash ^= (uint32_t)(c & 0x00FF),
+        -:  299:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+        -:  300:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+        -:  301:			hash ^= (uint32_t)(c & 0xFF00) >> 8,
+        -:  302:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+        -:  303:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull);
+        -:  304:
+        -:  305:	else if( sizeof(wchar_t) == 4 )
+       14:  306:		while( (c = (uint32_t)*data++) != 0 )
+       12:  307:			hash ^= (uint32_t)(c & 0x000000FF),
+       36:  308:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  309:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  310:			hash ^= (uint32_t)(c & 0x0000FF00) >> 8,
+       36:  311:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  312:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  313:			hash ^= (uint32_t)(c & 0x00FF0000) >> 16,
+       36:  314:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  315:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull),
+       12:  316:			hash ^= (uint32_t)(c & 0xFF000000) >> 24,
+       36:  317:			hash += (hash << 1ull) + (hash << 4ull) + (hash << 5ull) +
+       24:  318:			        (hash << 7ull) + (hash << 8ull) + (hash << 40ull);
+        -:  319:
+        1:  320:	return hash;
+        -:  321:}
+        -:  322:
+        -:  323:#endif
+        -:  324:#ifdef MSD_COMPILER_MSC
+        -:  325:	__pragma( warning(pop) )
+        -:  326:#endif

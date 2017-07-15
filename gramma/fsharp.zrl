@@ -1,0 +1,129 @@
+@IDENTIFIER
+	
+	% pusty znak
+	% litera
+	% litera, cyfra lub wybrane znaki
+	[\s]+([\p{L}\p{Nl}][0-9\p{L}\p{Nl}\p{Pc}\p{Mn}\p{Mc}\p{Cf}'_]*)
+	% |
+	% znak ``
+	% dowolne znaki do końca linii lub do napotkania znaków ``
+	% na razie bez uwzględniania tego wariantu
+	% (?:``([^`\n\r\t]|`[^`\n\r\t])+``)
+
+@ACCESS
+
+	[\s]+(public|internal|private)
+
+% SPECIAL_IDENTIFIERS:
+
+	% first - pierwszy lepszy
+	% first konkuruje z pozostałymi definicjami gdzie zostało użyte first
+	% ten znak który wystąpi wcześniej wygrywa i to on zostaje przetwarzany
+	% \FIRST ``
+	% \REGEX (``(?:[^`\n\r\t]|`[^`\n\r\t])+``)
+
+	% zamień i wyodrębnij, są to nazwy symboli
+	% $NUM to indeks zapisanego identyfikatora w tablicy
+	% \REPLACE ##{$NUM}##
+	% \EXTRACT
+
+% ciąg znaków z apostrofów
+#STRING_SINGLE
+	
+	\SCOPE ALL
+	\FIRST '
+	\REGEX '([^'])*'
+
+	% zamień ale nie wyodrębniaj, nie potrzeba ciągów znaków do wyszukiwania symboli
+	\REPLACE @@{STRS}@@
+
+% ciąg znaków z podwójnych apostrofów
+#STRING_DOUBLE
+	
+	\SCOPE ALL
+	\FIRST "
+	\REGEX "([^"])*"
+
+	% zamień ale nie wyodrębniaj, nie potrzeba ciągów znaków do wyszukiwania symboli
+	\REPLACE @@{STRD}@@
+
+% komentarz liniowy
+#COMMENT_LINE
+
+	\SCOPE ALL
+	\FIRST //
+	\REGEX //([^\n\r])z
+
+	% zamień i wyodrębnij, przydadzą się do sprawdzania funkcji
+	% $SL - start line, $EL - end line
+	\REPLACE %%[${LINE}]%%
+	\EXTRACT
+
+% komentarz blokowy
+#COMMENT_BLOCK
+
+	\SCOPE ALL
+	\FIRST /*
+	\REGEX \(\*([^*])*\*\)
+
+	% zamień i wyodrębnij, przydadzą się do sprawdzania funkcji
+	% $SL - start line, $EL - end line
+	\REPLACE %%[${START}:${END}]%%
+	\EXTRACT
+
+% przestrzeń nazw może być zdefiniowana tylko globalnie
+% można tworzyć przestrzenie nazw wewnątrz innych przestrzeni nazw, jednak musi się to odbyć globalnie
+% 
+% namespace OUTER
+% ...
+% namespace OUTER.INNER
+% ...
+#NAMESPACE
+	
+	\SCOPE GLOBAL
+	\REGEX namespace(?:${IDENTIFIER})[^;\r\n]*
+
+% moduł może być utworzony tylko globalnie, w przestrzeni nazw oraz w innym module
+% może mieć znak = na samym końcu gdy nie jest zdefiniowany w globalnej przestrzeni
+% można tworzyć moduły podrzędne
+% 
+% module OUTER
+% ...
+%     module INNER =
+% ...
+#MODULE
+
+	\SCOPE GLOBAL NAMESPACE MODULE
+	\REGEX module(?:${ACCESS})?(?:${IDENTIFIER})[\s]*(=)?
+
+% importuje moduł lub przestrzeń nazw do projektu
+% import może się wykonać tylko globalnie, w przestrzeni nazw lub module
+% 
+% open PACKAGE
+% ...
+#OPEN
+
+	% moduł może być zaimportowany tylko globalnie, w przestrzeni nazw oraz w module
+	\SCOPE GLOBAL NAMESPACE MODULE
+	\REGEX open(?:${IDENTIFIER})[^;=\r\n]*
+
+% definicja nowego wyjątku, wykorzystywanego w dalszej części programu
+% wyjątek może być przyporządkowany albo globalnie albo do modułu
+% 
+% ...
+% exception IDENTIFIER [of TYPE]
+% ...
+#EXCEPTION
+
+	\SCOPE GLOBAL MODULE
+	\REGEX exception(?:${IDENTIFIER})(?:[\s]*of[\s]*)?([^;\r\n])*
+
+#TYPE
+	
+	% typ może być zdefiniowany albo globalnie albo w module
+	\SCOPE GLOBAL MODULE
+	\REGEX type()
+
+#LET
+	
+#MEMBER

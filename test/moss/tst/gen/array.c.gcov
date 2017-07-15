@@ -1,0 +1,640 @@
+        -:    0:Source:../../src/array.c
+        -:    0:Programs:2
+        -:    1:/*
+        -:    2: *  Moss Library >>> http://moss.aculo.pl
+        -:    3: *
+        -:    4: *     /'\_/`\                           
+        -:    5: *    /\      \    ___     ____    ____  
+        -:    6: *    \ \ \__\ \  / __`\  /',__\  /',__\ 
+        -:    7: *     \ \ \_/\ \/\ \L\ \/\__, `\/\__, `\
+        -:    8: *      \ \_\\ \_\ \____/\/\____/\/\____/
+        -:    9: *       \/_/ \/_/\/___/  \/___/  \/___/ 
+        -:   10: *
+        -:   11: *  Source file for "Dynamic Array" module.
+        -:   12: *
+        -:   13: *  This file is part of Moss Library
+        -:   14: *  Copyright (c) by sobiemir <sobiemir@aculo.pl>
+        -:   15: *
+        -:   16: *  This program is free software: you can redistribute it and/or modify
+        -:   17: *  it under the terms of the GNU General Public License as published by
+        -:   18: *  the Free Software Foundation, either version 3 of the License, or
+        -:   19: *  (at your option) any later version.
+        -:   20: *
+        -:   21: *  This program is distributed in the hope that it will be useful,
+        -:   22: *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+        -:   23: *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        -:   24: *  GNU General Public License for more details.
+        -:   25: *
+        -:   26: *  You should have received a copy of the GNU General Public License
+        -:   27: *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+        -:   28: */
+        -:   29:
+        -:   30:#include <moss/array.h>
+        -:   31:
+        -:   32:/*
+        -:   33:======================================================================================================================
+        -:   34:------------------------------------------------------------------------------------------------------------------
+        -:   35:	NAGŁÓWKI FUNKCJI WBUDOWANYCH I STAŁE
+        -:   36:------------------------------------------------------------------------------------------------------------------
+        -:   37:======================================================================================================================
+        -:   38:*/
+        -:   39:
+        -:   40:/**
+        -:   41: * Modyfikuje wartość zmiennej capacity, mnożąc ją ze zmienną modifier.
+        -:   42: *
+        -:   43: * @param  capacity Aktualna pojemność tablicy.
+        -:   44: * @param  modifier Dodatkowy współczynnik do obliczeń.
+        -:   45: * @return          Nowa pojemność tablicy do przydzielenia.
+        -:   46: */
+        -:   47:static size_t msf_array_increase_multiply( size_t capacity, float modifier );
+        -:   48:
+        -:   49:/**
+        -:   50: * Modyfikuje wartość zmiennej capacity, dodając do niej wartość zmiennej modifier.
+        -:   51: *
+        -:   52: * @param  capacity Aktualna pojemność tablicy.
+        -:   53: * @param  modifier Dodatkowy współczynnik do obliczeń.
+        -:   54: * @return          Nowa pojemność tablicy do przydzielenia.
+        -:   55: */
+        -:   56:static size_t msf_array_increase_add( size_t capacity, float modifier );
+        -:   57:
+        -:   58:/**
+        -:   59: * Modyfikuje wartość zmiennej capacity, podnosząc ją do potęgi wartości zmiennej modifier.
+        -:   60: *
+        -:   61: * @param  capacity Aktualna pojemność tablicy.
+        -:   62: * @param  modifier Dodatkowy współczynnik do obliczeń.
+        -:   63: * @return          Nowa pojemność tablicy do przydzielenia.
+        -:   64: */
+        -:   65:static size_t msf_array_increase_power( size_t capacity, float modifier );
+        -:   66:
+        -:   67:/* ================================================================================================================== */
+        -:   68:
+        -:   69:const struct MSS_ARRAYFUNCTIONS MSC_ArrayFunctions =
+        -:   70:{
+        -:   71:	msf_array_increase_multiply,    /* IncMultiply */
+        -:   72:	msf_array_increase_add,         /* IncAdd */
+        -:   73:	msf_array_increase_power        /* IncPower */
+        -:   74:};
+        -:   75:
+        -:   76:/*
+        -:   77:======================================================================================================================
+        -:   78:------------------------------------------------------------------------------------------------------------------
+        -:   79:	TWORZENIE I INICJALIZACJA
+        -:   80:------------------------------------------------------------------------------------------------------------------
+        -:   81:======================================================================================================================
+        -:   82:*/
+        -:   83:
+        7:   84:void *ms_array_alloc( size_t size, size_t capacity )
+        -:   85:{
+        -:   86:	MS_ARRAY *array;
+        -:   87:
+        7:   88:	if( (array = malloc(sizeof *array)) == NULL )
+    #####:   89:		return NULL;
+        -:   90:
+        7:   91:	if( ms_array_init(array, size, capacity) )
+        -:   92:		return
+    #####:   93:			free( array ),
+        -:   94:			NULL;
+        -:   95:
+        7:   96:	array->Destroy = TRUE;
+        7:   97:	return array;
+        -:   98:}
+        -:   99:
+        -:  100:/* ================================================================================================================== */
+        -:  101:
+       15:  102:int ms_array_init( void *aptr, size_t size, size_t capacity )
+        -:  103:{
+       15:  104:	MS_ARRAY *array = aptr;
+        -:  105:
+       15:  106:	assert( array );
+        -:  107:
+       15:  108:	array->Capacity = capacity == 0
+        -:  109:		? MSD_ARRAY_DEFAULT_SIZE
+       15:  110:		: capacity;
+       15:  111:	array->ItemSize = size;
+       15:  112:	array->Length   = 0;
+       15:  113:	array->Modifier = 2.f;
+       15:  114:	array->Destroy  = FALSE;
+        -:  115:
+       15:  116:	array->FuncIncrease = MSC_ArrayFunctions.IncMultiply;
+        -:  117:
+        -:  118:	/* przydziel pamięć na elementy tablicy */
+       15:  119:	array->Items = malloc( array->Capacity * array->ItemSize );
+        -:  120:
+       15:  121:	if( !array->Items )
+        -:  122:		return
+    #####:  123:			ms_array_free( array ),
+        -:  124:			MSEC_MEMORY_ALLOCATION;
+        -:  125:
+       15:  126:	return MSEC_OK;
+        -:  127:}
+        -:  128:
+        -:  129:/* ================================================================================================================== */
+        -:  130:
+        2:  131:MS_ARRAY ms_array_return_local( size_t size, size_t capacity )
+        -:  132:{
+        -:  133:	MS_ARRAY array;
+        2:  134:	IGRET ms_array_init( &array, size, capacity );
+        2:  135:	return array;
+        -:  136:}
+        -:  137:
+        -:  138:/*
+        -:  139:======================================================================================================================
+        -:  140:------------------------------------------------------------------------------------------------------------------
+        -:  141:	ZMIANA POJEMNOŚCI
+        -:  142:------------------------------------------------------------------------------------------------------------------
+        -:  143:======================================================================================================================
+        -:  144:*/
+        -:  145:
+       20:  146:int ms_array_realloc( void *aptr, size_t capacity )
+        -:  147:{
+       20:  148:	MS_ARRAY *array = aptr;
+        -:  149:	void     *tmp;
+        -:  150:
+       20:  151:	assert( array );
+       20:  152:	assert( array->Items );
+        -:  153:
+        -:  154:	/* powiększ ilość pamięci - w przypadku dokładnego zwiększania, wartość musi być podana w capacity */
+       20:  155:	if( !capacity )
+        -:  156:	{
+        5:  157:		if( !array->FuncIncrease )
+        1:  158:			SETERRNOANDRETURN( MSEC_INVALID_VALUE );
+        -:  159:
+        4:  160:		capacity = array->FuncIncrease( array->Capacity, array->Modifier );
+        -:  161:	
+        4:  162:		if( capacity <= array->Capacity )
+        1:  163:			capacity = array->Capacity + 1;
+        -:  164:	}
+        -:  165:	/* aby przydzielić taką ilość pamięci elementy muszą najpierw zostać usunięte */
+       15:  166:	else if( array->Length > capacity )
+        1:  167:		SETERRNOANDRETURN( MSEC_DATA_OVERFLOW );
+        -:  168:
+        -:  169:	/* przydziel nową ilość pamięci */
+       18:  170:	if( (tmp = realloc(array->Items, capacity * array->ItemSize)) == NULL )
+    #####:  171:		return MSEC_MEMORY_ALLOCATION;
+        -:  172:
+       18:  173:	array->Items    = tmp;
+       18:  174:	array->Capacity = capacity;
+        -:  175:
+       18:  176:	return MSEC_OK;
+        -:  177:}
+        -:  178:
+        -:  179:/* ================================================================================================================== */
+        -:  180:
+        8:  181:int ms_array_realloc_min( void *aptr, size_t min )
+        -:  182:{
+        8:  183:	MS_ARRAY *array = aptr;
+        -:  184:
+        -:  185:	size_t capacity;
+        -:  186:	size_t oldcap;
+        -:  187:
+        8:  188:	assert( array );
+        8:  189:	assert( array->Items );
+        -:  190:
+        8:  191:	capacity = array->Capacity;
+        -:  192:
+        -:  193:	/* osiągnij co najmniej wartość minimalną, z czego nowy rozmiar nie może być mniejszy niż stary */
+       30:  194:	while( min > capacity )
+        -:  195:	{
+       14:  196:		oldcap   = capacity;
+       28:  197:		capacity = !array->FuncIncrease
+        -:  198:			? min
+       14:  199:			: array->FuncIncrease( oldcap, array->Modifier );
+       14:  200:		if( capacity <= oldcap )
+        1:  201:			capacity = oldcap + 1;
+        -:  202:	}
+        -:  203:
+        -:  204:	/* przydziel nową ilość pamięci gdy pojemność się różni */
+        8:  205:	if( capacity != array->Capacity )
+        6:  206:		return ms_array_realloc( aptr, capacity );
+        -:  207:
+        2:  208:	return MSEC_OK;
+        -:  209:}
+        -:  210:
+        -:  211:/*
+        -:  212:======================================================================================================================
+        -:  213:------------------------------------------------------------------------------------------------------------------
+        -:  214:	KOPIOWANIE
+        -:  215:------------------------------------------------------------------------------------------------------------------
+        -:  216:======================================================================================================================
+        -:  217:*/
+        -:  218:
+        3:  219:int ms_array_copy( void *adst, const void *asrc )
+        -:  220:{
+        3:  221:	const MS_ARRAY *src = asrc;
+        3:  222:	MS_ARRAY       *dst = adst;
+        -:  223:	
+        -:  224:	int ercode;
+        -:  225:
+        3:  226:	assert( src );
+        3:  227:	assert( src->Items );
+        3:  228:	assert( dst );
+        -:  229:
+        3:  230:	if( (ercode = ms_array_init(dst, src->ItemSize, src->Capacity)) != 0 )
+    #####:  231:		return ercode;
+        -:  232:
+        3:  233:	IGRET memcpy( dst->Items, src->Items, src->Capacity * src->ItemSize );
+        3:  234:	dst->Length = src->Length;
+        -:  235:
+        3:  236:	return MSEC_OK;
+        -:  237:}
+        -:  238:
+        -:  239:/* ================================================================================================================== */
+        -:  240:
+        3:  241:void *ms_array_copy_alloc( const void *aptr )
+        -:  242:{
+        3:  243:	const MS_ARRAY *array = aptr;
+        -:  244:	MS_ARRAY       *retval;
+        -:  245:
+        3:  246:	assert( array );
+        3:  247:	assert( array->Items );
+        -:  248:
+        3:  249:	if( (retval = ms_array_alloc(array->ItemSize, array->Capacity)) == NULL )
+    #####:  250:		return NULL;
+        -:  251:
+        3:  252:	IGRET memcpy( retval->Items, array->Items, array->Capacity * array->ItemSize );
+        3:  253:	retval->Length = array->Length;
+        -:  254:
+        3:  255:	return retval;
+        -:  256:}
+        -:  257:
+        -:  258:/*
+        -:  259:======================================================================================================================
+        -:  260:------------------------------------------------------------------------------------------------------------------
+        -:  261:	DODAWANIE ELEMENTÓW
+        -:  262:------------------------------------------------------------------------------------------------------------------
+        -:  263:======================================================================================================================
+        -:  264:*/
+        -:  265:
+        5:  266:int ms_array_insert_value( void *aptr, size_t index, const void *item )
+        -:  267:{
+        5:  268:	MS_ARRAY *array = aptr;
+        -:  269:	void     *ptr;
+        -:  270:
+        5:  271:	assert( array );
+        5:  272:	assert( array->Items );
+        5:  273:	assert( item );
+        -:  274:
+        5:  275:	if( index > array->Length )
+        1:  276:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  277:	
+        -:  278:	/* sprawdź czy nowy element się zmieści */
+        4:  279:	if( array->Length >= array->Capacity )
+        -:  280:	{
+        4:  281:		int ercode = ms_array_realloc( array, !array->FuncIncrease
+        2:  282:			? array->Capacity + 1
+        -:  283:			: 0 );
+        2:  284:		if( ercode )
+    #####:  285:			return ercode;
+        -:  286:	}
+        4:  287:	ptr = (unsigned char*)array->Items + array->ItemSize * index;
+        -:  288:
+        -:  289:	/* przesuń elementy */
+        4:  290:	if( index != array->Length )
+        1:  291:		IGRET memmove( (unsigned char*)ptr + array->ItemSize, ptr, array->ItemSize * (array->Length - index) );
+        -:  292:
+        -:  293:	/* dodaj nowy element */
+        4:  294:	IGRET memcpy( ptr, item, array->ItemSize );
+        4:  295:	++array->Length;
+        -:  296:
+        4:  297:	return MSEC_OK;
+        -:  298:}
+        -:  299:
+        -:  300:/* ================================================================================================================== */
+        -:  301:
+       10:  302:int ms_array_insert_values( void *adst, size_t index, const void *tsrc, size_t size )
+        -:  303:{
+       10:  304:	MS_ARRAY *array = adst;
+        -:  305:	void     *ptr;
+        -:  306:
+       10:  307:	assert( array );
+       10:  308:	assert( array->Items );
+       10:  309:	assert( tsrc );
+        -:  310:
+       10:  311:	if( index > array->Length )
+        1:  312:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  313:
+        -:  314:	/* sprawdź czy nowy element się zmieści */
+        9:  315:	if( array->Length + size > array->Capacity )
+        -:  316:	{
+        3:  317:		int ercode = ms_array_realloc_min( array, array->Length + size );
+        3:  318:		if( ercode )
+    #####:  319:			return ercode;
+        -:  320:	}
+        6:  321:	else if( !size )
+        1:  322:		SETERRNOANDRETURN( MSEC_INVALID_ARGUMENT );
+        -:  323:
+        8:  324:	ptr = (unsigned char*)array->Items + array->ItemSize * index;
+        -:  325:
+        -:  326:	/* przesuń elementy
+        -:  327:	 * memmove potrafi radzić sobie z nakładającymi się adresami dwóch wskaźników */
+        8:  328:	if( index != array->Length )
+        2:  329:		IGRET memmove( (unsigned char*)ptr + array->ItemSize * size, ptr, array->ItemSize * (array->Length - index) );
+        -:  330:
+        -:  331:	/* kopiuj elementy do tablicy */
+        8:  332:	IGRET memcpy( ptr, tsrc, array->ItemSize * size );
+        8:  333:	array->Length += size;
+        -:  334:
+        8:  335:	return MSEC_OK;
+        -:  336:}
+        -:  337:
+        -:  338:/* ================================================================================================================== */
+        -:  339:
+        4:  340:int ms_array_join_slice( void *adst, const void *asrc, size_t offset, size_t count )
+        -:  341:{
+        4:  342:	const MS_ARRAY *src = asrc;
+        4:  343:	MS_ARRAY       *dst = adst;
+        -:  344:
+        4:  345:	assert( src );
+        4:  346:	assert( src->Items );
+        4:  347:	assert( dst );
+        4:  348:	assert( dst->Items );
+        -:  349:
+        4:  350:	if( count == 0 )
+        2:  351:		count = src->Length - offset;
+        -:  352:
+        -:  353:	/* rozmiary muszą się zgadzać oraz indeksy nie mogą wychodzić poza ilość elementów w tablicy */
+        4:  354:	if( src->ItemSize != dst->ItemSize || src->Length == 0 )
+        1:  355:		SETERRNOANDRETURN( MSEC_INVALID_ARGUMENT );
+        3:  356:	if( offset >= src->Length || offset + count > src->Length )
+        1:  357:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  358:
+        2:  359:	return ms_array_push_values( dst, (unsigned char*)src->Items + offset * src->ItemSize, count );
+        -:  360:}
+        -:  361:
+        -:  362:/* ================================================================================================================== */
+        -:  363:
+        4:  364:int ms_array_join_slice_inverse( void *adst, const void *asrc, size_t offset, size_t count )
+        -:  365:{
+        4:  366:	size_t          osumc = offset + count;
+        4:  367:	const MS_ARRAY *src   = asrc;
+        4:  368:	MS_ARRAY       *dst   = adst;
+        -:  369:
+        -:  370:	int ercode;
+        -:  371:
+        4:  372:	assert( src );
+        4:  373:	assert( src->Items );
+        4:  374:	assert( dst );
+        4:  375:	assert( dst->Items );
+        -:  376:
+        4:  377:	if( count == 0 )
+        1:  378:		osumc = offset + (count = src->Length - offset);
+        -:  379:
+        -:  380:	/* rozmiary muszą się zgadzać oraz indeksy nie mogą wychodzić poza ilość elementów w tablicy */
+        4:  381:	if( src->ItemSize != dst->ItemSize || src->Length == 0 )
+        1:  382:		SETERRNOANDRETURN( MSEC_INVALID_ARGUMENT );
+        3:  383:	if( offset >= src->Length || osumc > src->Length )
+        1:  384:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  385:
+        2:  386:	if( dst->Length < src->Length - count )
+        1:  387:		if( (ercode = ms_array_realloc_min(dst, src->Length - count)) != 0 )
+    #####:  388:			return ercode;
+        -:  389:
+        -:  390:	/* dodaj pierwszą część */
+        2:  391:	if( offset > 0 && (ercode = ms_array_push_values(dst, src->Items, offset)) != 0 )
+    #####:  392:		return ercode;
+        -:  393:
+        -:  394:	/* dodaj drugą część */
+        2:  395:	if( osumc < src->Length )
+        -:  396:	{
+        1:  397:		ercode = ms_array_push_values(
+        -:  398:			dst,
+        -:  399:			(unsigned char*)src->Items + osumc * src->ItemSize,
+        -:  400:			src->Length - osumc
+        -:  401:		);
+        1:  402:		if( ercode )
+    #####:  403:			return ercode;
+        -:  404:	}
+        -:  405:	
+        2:  406:	return MSEC_OK;
+        -:  407:}
+        -:  408:
+        -:  409:/*
+        -:  410:======================================================================================================================
+        -:  411:------------------------------------------------------------------------------------------------------------------
+        -:  412:	USUWANIE ELEMENTÓW
+        -:  413:------------------------------------------------------------------------------------------------------------------
+        -:  414:======================================================================================================================
+        -:  415:*/
+        -:  416:
+        5:  417:int ms_array_slice( void *aptr, size_t offset, size_t count )
+        -:  418:{
+        5:  419:	MS_ARRAY *array = aptr;
+        -:  420:
+        5:  421:	assert( array );
+        5:  422:	assert( array->Items );
+        -:  423:
+        5:  424:	if( count == 0 )
+        1:  425:		count = array->Length - offset;
+        -:  426:
+        5:  427:	if( array->Length == 0 )
+        1:  428:		SETERRNOANDRETURN( MSEC_INVALID_ARGUMENT );
+        4:  429:	if( offset >= array->Length || offset + count > array->Length )
+        1:  430:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  431:
+        3:  432:	if( offset != 0 )
+        6:  433:		IGRET memmove(
+        2:  434:			array->Items,
+        2:  435:			(unsigned char*)array->Items + offset * array->ItemSize,
+        2:  436:			count * array->ItemSize
+        -:  437:		);
+        -:  438:
+        3:  439:	array->Length = count;
+        3:  440:	return MSEC_OK;
+        -:  441:}
+        -:  442:
+        -:  443:/* ================================================================================================================== */
+        -:  444:
+        4:  445:int ms_array_remove_range( void *aptr, size_t offset, size_t count )
+        -:  446:{
+        4:  447:	MS_ARRAY      *array = aptr;
+        -:  448:	unsigned char *ptr1;
+        -:  449:	unsigned char *ptr2;
+        -:  450:
+        4:  451:	assert( array );
+        4:  452:	assert( array->Items );
+        -:  453:
+        -:  454:	/* do końca... */
+        4:  455:	if( count == 0 )
+        1:  456:		count = array->Length - offset;
+        -:  457:
+        4:  458:	if( array->Length == 0 )
+        1:  459:		SETERRNOANDRETURN( MSEC_INVALID_ARGUMENT );
+        3:  460:	if( offset >= array->Length || offset + count > array->Length )
+        1:  461:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  462:
+        2:  463:	if( count + offset == array->Length )
+        1:  464:		array->Length = offset;
+        -:  465:	else
+        1:  466:		ptr1 = (unsigned char*)array->Items + offset * array->ItemSize,
+        1:  467:		ptr2 = ptr1 + count * array->ItemSize,
+        -:  468:
+        1:  469:		IGRET memmove( ptr1, ptr2, (array->Length - (count + offset)) * array->ItemSize ),
+        1:  470:		array->Length -= count;
+        -:  471:	
+        2:  472:	return MSEC_OK;
+        -:  473:}
+        -:  474:
+        -:  475:/* ================================================================================================================== */
+        -:  476:
+        4:  477:int ms_array_remove( void *aptr, size_t index )
+        -:  478:{
+        4:  479:	MS_ARRAY      *array = aptr;
+        -:  480:	unsigned char *ptr1;
+        -:  481:	unsigned char *ptr2;
+        -:  482:
+        4:  483:	assert( array );
+        4:  484:	assert( array->Items );
+        -:  485:
+        -:  486:	/* indeks poza zakresem, nic nie rób... */
+        4:  487:	if( array->Length == 0 )
+        1:  488:		SETERRNOANDRETURN( MSEC_INVALID_ARGUMENT );
+        3:  489:	else if( index >= array->Length )
+        1:  490:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  491:
+        2:  492:	--array->Length;
+        -:  493:
+        -:  494:	/* przenoś tylko gdy usuwany element nie jest ostatni */
+        2:  495:	if( index != array->Length )
+        -:  496:		/* przenieś wszystkie elementy znajdujące się za indeksem */
+        1:  497:		ptr1 = (unsigned char*)array->Items + array->ItemSize * index,
+        1:  498:		ptr2 = ptr1 + array->ItemSize,
+        -:  499:
+        1:  500:		IGRET memmove( ptr1, ptr2, array->ItemSize * (array->Length - index) );
+        -:  501:	
+        2:  502:	return MSEC_OK;
+        -:  503:}
+        -:  504:
+        -:  505:/*
+        -:  506:======================================================================================================================
+        -:  507:------------------------------------------------------------------------------------------------------------------
+        -:  508:	CZYSZCZENIE DANYCH
+        -:  509:------------------------------------------------------------------------------------------------------------------
+        -:  510:======================================================================================================================
+        -:  511:*/
+        -:  512:
+       20:  513:void ms_array_clear( void *aptr )
+        -:  514:{
+       20:  515:	MS_ARRAY *array = aptr;
+        -:  516:
+       20:  517:	assert( array );
+       20:  518:	assert( array->Items );
+        -:  519:
+       20:  520:	array->Length = 0;
+       20:  521:}
+        -:  522:
+        -:  523:/* ================================================================================================================== */
+        -:  524:
+       16:  525:void ms_array_free( void *aptr )
+        -:  526:{
+       16:  527:	MS_ARRAY *array = aptr;
+        -:  528:
+       16:  529:	if( !array )
+        1:  530:		return;
+        -:  531:
+        -:  532:	/* usuń wszystkie elementy z tablicy */
+       15:  533:	if( array->Items )
+       15:  534:		ms_array_clear( array );
+        -:  535:
+       15:  536:	free( array->Items );
+       15:  537:	array->Items = NULL;
+        -:  538:
+       15:  539:	array->Capacity = 0;
+       15:  540:	array->ItemSize = 0;
+       15:  541:	array->Length   = 0;
+       15:  542:	array->Modifier = 2.f;
+        -:  543:
+       15:  544:	if( array->Destroy )
+        7:  545:		free( array );
+        -:  546:}
+        -:  547:
+        -:  548:/*
+        -:  549:======================================================================================================================
+        -:  550:------------------------------------------------------------------------------------------------------------------
+        -:  551:	BAZA FUNKCJI POCHODNYCH
+        -:  552:------------------------------------------------------------------------------------------------------------------
+        -:  553:======================================================================================================================
+        -:  554:*/
+        -:  555:
+        1:  556:MS_ARRAY ms_array_return( size_t capacity )
+        -:  557:{
+        -:  558:	MS_ARRAY array;
+        1:  559:	IGRET ms_array_init( &array, sizeof(*array.Items), capacity );
+        1:  560:	return array;
+        -:  561:}
+        -:  562:
+        -:  563:/* ================================================================================================================== */
+        -:  564:
+        2:  565:MS_ARRAY ms_array_copy_return( const MS_ARRAY *array )
+        -:  566:{
+        -:  567:	MS_ARRAY copy;
+        2:  568:	IGRET ms_array_copy( &copy, array );
+        2:  569:	return copy;
+        -:  570:}
+        -:  571:
+        -:  572:/* ================================================================================================================== */
+        -:  573:
+        1:  574:int ms_array_push( MS_ARRAY *array, const void *item )
+        -:  575:{
+        1:  576:	assert( array );
+        1:  577:	assert( array->Items );
+        -:  578:
+        1:  579:	return ms_array_insert( array, array->Length, item );
+        -:  580:}
+        -:  581:
+        -:  582:/* ================================================================================================================== */
+        -:  583:
+        5:  584:int ms_array_insert( MS_ARRAY *array, size_t index, const void *item )
+        -:  585:{
+        5:  586:	assert( array );
+        5:  587:	assert( array->Items );
+        -:  588:
+        -:  589:	/* sprawdź czy indeks nie wyjdzie poza granice */
+        5:  590:	if( index > array->Length )
+        1:  591:		SETERRNOANDRETURN( MSEC_OUT_OF_RANGE );
+        -:  592:
+        -:  593:	/* sprawdź czy nowy element się zmieści */
+        4:  594:	if( array->Length >= array->Capacity )
+        -:  595:	{
+        4:  596:		int ercode = ms_array_realloc( array, !array->FuncIncrease
+        2:  597:			? array->Capacity + 1
+        -:  598:			: 0 );
+        2:  599:		if( ercode )
+    #####:  600:			return ercode;
+        -:  601:	}
+        -:  602:	/* przesuń elementy */
+        4:  603:	if( index != array->Length )
+        3:  604:		IGRET memmove( &array->Items[index + 1], &array->Items[index], array->ItemSize * (array->Length - index) ); 
+        -:  605:
+        -:  606:	/* dodaj nowy element */
+        4:  607:	array->Items[index] = (void*)item;
+        4:  608:	++array->Length;
+        -:  609:
+        4:  610:	return MSEC_OK;
+        -:  611:}
+        -:  612:
+        -:  613:/*
+        -:  614:======================================================================================================================
+        -:  615:------------------------------------------------------------------------------------------------------------------
+        -:  616:	FUNKCJE WEWNĘTRZNE
+        -:  617:------------------------------------------------------------------------------------------------------------------
+        -:  618:======================================================================================================================
+        -:  619:*/
+        -:  620:
+       10:  621:static size_t msf_array_increase_multiply( size_t capacity, float factor )
+        -:  622:{
+       10:  623:	return (size_t)(factor * (float)capacity);
+        -:  624:}
+        -:  625:
+        -:  626:/* ================================================================================================================== */
+        -:  627:
+        1:  628:static size_t msf_array_increase_add( size_t capacity, float factor )
+        -:  629:{
+        1:  630:	return capacity + (size_t)factor;
+        -:  631:}
+        -:  632:
+        -:  633:/* ================================================================================================================== */
+        -:  634:
+        6:  635:static size_t msf_array_increase_power( size_t capacity, float factor )
+        -:  636:{
+        6:  637:	return (size_t)pow( (double)capacity, factor );
+        -:  638:}
