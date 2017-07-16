@@ -1167,3 +1167,15 @@ MST_SUITE MSV_ArraySuite =
 	}
 
 #endif
+
+// Test komentarza liniowego
+// Taki tam komentarz
+// Uhuhu
+
+// Inny komentarz z innej strony
+
+// Komentarz wielolioniowy \
+	Asadsad asdjas diosaj dio
+	int xacv() {
+		return 4; // zwróć coś
+	}
