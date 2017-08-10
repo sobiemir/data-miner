@@ -64,18 +64,55 @@ class Berseker
 
 		$this->rules = [
 			'ENTRY' => [
-				3,
+				['execute', 'NEWLINE_UNIFICATION_START'],
+				['rewind', 0],
 				['loop', 'ENTRY_LOOP'],
 				['rewind', 0]
 			],
+			'NEWLINE_UNIFICATION_START' => [
+				['uaseek',
+					[
+						"\r" => false,
+						"\n" => false
+					],
+					false
+				],
+				// gdy CR+LF, zamieniaj na LF, w przeciwnym wypadku pozostaw jak jest
+				['next', "\r", false, true],
+				['seek', 1, false],
+				['next', "\n", false, true],
+				['seek', -1, false],
+				['loop', 'NEWLINE_UNIFICATION_CRLF']
+			],
+			'NEWLINE_UNIFICATION_CRLF' => [
+				['useek',
+					"\r",
+					false
+				],
+				['replace', ' ', false]
+			],
 			'ENTRY_LOOP' => [
-				4,
-				['useek', '/', false],
-				['seek', 1],
-				['execute', 'COMMENT']
+				['uaseek',
+					[
+						'/' => false,
+						'"' => false,
+						"'" => false
+					],
+					false
+				],
+				['echar', [
+					'"' => 'SKIP_CONTENT_DQUOTE',
+					"'" => 'SKIP_CONTENT_SQUOTE',
+					'/' => 'COMMENT'
+				]]
+			],
+			'SKIP_CONTENT_DQUOTE' => [
+				['uereplace', '"', '\\', ' ', true]
+			],
+			'SKIP_CONTENT_SQUOTE' => [
+				['uereplace', "'", '\\', ' ', true]
 			],
 			'COMMENT' => [
-				2,
 				['char',
 					[
 						'/' => 'COMMENT_LINE_START',
@@ -85,16 +122,14 @@ class Berseker
 				]
 			],
 			'COMMENT_BLOCK_START' => [
-				7,
 				['group', 'COMMENT_BLOCK'],
-				['seek', -2],
-				['replace', ' '],
-				['replace', ' '],
+				['seek', -2, false],
+				['replace', ' ', false],
+				['replace', ' ', false],
 				['execute', 'COMMENT_BLOCK'],
 				['group', false]
 			],
 			'COMMENT_BLOCK' => [
-				5,
 				['uareplace',
 					[
 						"\r" => false,
@@ -109,39 +144,40 @@ class Berseker
 					'COMMENT_BLOCK_END_PREPARE',
 					false
 				],
-				['seek', 1],
+				['seek', 1, true],
 				['execute', 'COMMENT_BLOCK']
 			],
 			'COMMENT_BLOCK_END_PREPARE' => [
-				5,
 				['next',
 					'/',
 					'COMMENT_BLOCK_END',
 					false
 				],
-				['seek', -1],
-				['replace', ' '],
+				['seek', -1, false],
+				['replace', ' ', true],
 				['execute', 'COMMENT_BLOCK']
 			],
 			'COMMENT_BLOCK_END' => [
-				4,
-				['seek', -2],
-				['replace', ' '],
-				['replace', ' ']
+				['seek', -2, false],
+				['replace', ' ', false],
+				['replace', ' ', false]
 			],
 			'COMMENT_LINE_START' => [
-				6,
 				['group', 'COMMENT_LINE'],
-				['seek', -1],
-				['replace', ' '],
+				['seek', -1, false],
+				['replace', ' ', false],
 				['execute', 'COMMENT_LINE'],
 				['group', false]
 			],
+			'COMMENT_LINE_CONTINUE' => [
+				['seek', -1, false],
+				['write', false],
+				['execute', 'COMMENT_LINE']
+			],
 			'COMMENT_LINE' => [
-				8,
-				['seek', -2],
-				['replace', ' '],
-				['seek', 1],
+				['seek', -2, false],
+				['replace', ' ', false],
+				['seek', 1, false],
 				['uareplace',
 					[
 						'\\' => false,
@@ -151,16 +187,18 @@ class Berseker
 					' ',
 					true
 				],
+				// dodatkowa grupa dla nowej linii
 				['next', '\\', false, true ],
-				['write', "\n"],
-				['seek', 1],
+				['seek', 1, false],
 				['char',
 					[
-						"\r" => 'COMMENT_LINE',
-						"\n" => 'COMMENT_LINE'
+						"\r" => 'COMMENT_LINE_CONTINUE',
+						"\n" => 'COMMENT_LINE_CONTINUE'
 					],
 					false
-				]
+				],
+				['write', '\\'],
+				['execute', 'COMMENT_LINE']
 			]
 
 
@@ -275,50 +313,6 @@ class Berseker
 			// 			"\n" => 'skip_line'
 			// 		],
 			// 		false
-			// 	]
-			// ],
-
-			// // rozpoznanie typu komentarza
-			// 'comment' => [
-			// 	2,
-			// 	['char',
-			// 		[
-			// 			'/' => 'comment_line',
-			// 			'*' => 'comment_block'
-			// 		],
-			// 		'skip_line'
-			// 	]
-			// ],
-
-			// // komentarz liniowy
-			// 'comment_line' => [
-			// 	4,
-			// 	// pobieraj dane do napotkania jednego ze znaków (until get)
-			// 	['uget', [
-			// 		'\\' => false,
-			// 		"\r" => false,
-			// 		"\n" => false
-			// 	]],
-			// 	['ibchar', '\\'],
-			// 	['char',
-			// 		[
-			// 			"\r" => 'comment_line',
-			// 			"\n" => 'comment_line'
-			// 		],
-			// 		false
-			// 	]
-			// ],
-
-			// // komentarz blokowy
-			// 'comment_block' => [
-			// 	3,
-			// 	['uget', [
-			// 		'*' => true
-			// 	]],
-			// 	['next',
-			// 		'/',
-			// 		false,
-			// 		'comment_block'
 			// 	]
 			// ],
 
@@ -481,10 +475,10 @@ class Berseker
 				break;
 			Logger::IndentInc();
 
-			for( $x = 1; $x < $lrule[0]; ++$x )
+			foreach( $lrule as $val )
 			{
-				Logger::Log( "+ {$lrule[$x][0]}" );
-				if( !$this->{$lrule[$x][0]}($lrule[$x]) )
+				Logger::Log( "+ {$val[0]}" );
+				if( !$this->{$val[0]}($val) )
 				{
 					$isrun = false;
 					break;
@@ -525,10 +519,13 @@ class Berseker
 	 * DESCRIPTION:
 	 *     Kursor można przesuwać zarówno do przodu jak i do tyłu.
 	 *     Wszystko zależy od tego czy w drugim argumencie podana zostanie wartość dodatnia czy ujemna.
+	 *     Dodatkowo przesunięte dane można pobrać, podając wartość true do drugiego argumentu.
+	 *     Dane zawsze pobierane są od początku - nie ma więc sytuacji, że są odwrócone gdy wartość
+	 *     przesunięcia podana w pierwszym argumencie jest ujemna.
 	 *
 	 * CODE:
-	 *     // przesuwa kursor o dwa pola do tyłu
-	 *     ['seek', -2]
+	 *     // przesuwa kursor o dwa pola do tyłu bez pobierania danych
+	 *     ['seek', -2, false]
 	 *
 	 * PARAMETERS:
 	 *     $rule Tablica z argumentami dla reguły.
@@ -538,9 +535,51 @@ class Berseker
 	 */
 	protected function seek( array &$rule ): bool
 	{
-		Logger::Log( "  - [{$rule[1]}] from [{$this->pos}]" );
+		Logger::Log( "  - [{$rule[1]} : \"" . $this->readableChar($this->data[$this->pos + $rule[1]]) .
+			"\"] from [{$this->pos} : \"" . $this->readableChar($this->data[$this->pos]) . "\"]" );
+
+		if( $rule[2] )
+		{
+			Logger::Log( "  - save data to current group" );
+			if( $rule[1] > 0 )
+				$this->gcontent[$this->gpos] .= substr( $this->data, $this->pos, $rule[1] );
+			else
+				$this->gcontent[$this->gpos] .= substr( $this->data, $this->pos - $rule[1], -$rule[1] );
+		}
 
 		$this->pos += $rule[1];
+		return true;
+	}
+
+	protected function rseek( array &$rule ): bool
+	{
+		Logger::Log( "  - to [{$rule[1]} : \"" . $this->readableChar($this->data[$this->pos + $rule[1]]) .
+			"\"] from [{$this->pos} : \"" . $this->readableChar($this->data[$this->pos]) . "\"]" );
+
+		// pobierz znaki
+		if( $rule[3] )
+		{
+			Logger::Log( "  - save data to current group" );
+			if( $rule[1] > 0 )
+				$this->gcontent[$this->gpos] .= substr( $this->data, $this->pos, $rule[1] );
+			else
+				$this->gcontent[$this->gpos] .= substr( $this->data, $this->pos - $rule[1], -$rule[1] );
+		}
+
+		// przesuń kursor i zamieniaj poszczególne znaki
+		if( $rule[2] )
+		{
+			Logger::Log( "  - replace all values to: {$rule[2]}" );
+			if( $rule[1] < 0 )
+				for( $x = $this->pos - $rule[1]; $this->pos > $x; --$this->pos )
+					$this->data[$this->pos] = $rule[2];
+			else
+				for( $x = $this->pos + $rule[1]; $this->pos < $x; ++$this->pos )
+					$this->data[$this->pos] = $rule[2];
+		}
+		else
+			$this->pos += $rule[1];
+
 		return true;
 	}
 
@@ -565,6 +604,13 @@ class Berseker
 	{
 		Logger::Log( '  - "' . $this->readableChar($this->data[$this->pos]) . '" to "'
 			. $this->readableChar($rule[1]) . '"' );
+
+		// pobierz znaki
+		if( $rule[2] )
+		{
+			Logger::Log( "  - save data to current group" );
+			$this->gcontent[$this->gpos] .= $this->data[$this->pos];
+		}
 
 		$this->data[$this->pos++] = $rule[1];
 		return true;
@@ -763,6 +809,9 @@ class Berseker
 			while( $this->length > $this->pos && $this->data[$this->pos] != $rule[1] )
 				$this->pos++;
 
+		if( $this->length <= $this->pos )
+			return false;
+
 		return true;
 	}
 
@@ -773,13 +822,14 @@ class Berseker
 	 *     Pomijane dane można pobrać do aktualnej grupy, podając jako trzeci parametr wartość TRUE.
 	 *     Znak stopu podawany jest jako drugi parametr.
 	 *     Skrót "uaseek" od "until array seek".
+	 *     Podanie wartości po indeksie oznacza pobieranie wykrytego znaku lub nie.
 	 *
 	 * CODE:
 	 *     // przewija i pobiera znaki aż do napotkania jednego ze znaków "/", "*" lub "$"
 	 *     ['uaseek', [
-	 *             '/',
-	 *             '*',
-	 *             '$'
+	 *             '/' => false,
+	 *             '*' => false,
+	 *             '$' => false
 	 *         ],
 	 *         true
 	 *     ]
@@ -792,7 +842,7 @@ class Berseker
 	 */
 	protected function uaseek( array &$rule ): bool
 	{
-		Logger::Log('  - seek until one of "' . $this->readableCharArray($rule[1]) . '"' );
+		Logger::Log('  - seek until one of [' . $this->readableCharArray($rule[1]) . ']' );
 
 		// przewijaj i pobieraj znaki
 		if( $rule[2] )
@@ -802,6 +852,10 @@ class Berseker
 		else
 			while( $this->length > $this->pos && !isset($rule[1][$this->data[$this->pos]]) )
 				$this->pos++;
+
+		// pobierz ostatni znak gdy tak zostało podane w regule
+		if( $this->length > $this->pos && $rule[1][$this->data[$this->pos]] )
+			$this->pos++;
 
 		return true;
 	}
@@ -892,6 +946,12 @@ class Berseker
 		return true;
 	}
 
+	protected function sleep( array &$rule ): bool
+	{
+		sleep( $rule[1] );
+		return true;
+	}
+
 	protected function write( array &$rule ): bool
 	{
 		$this->gcontent[$this->gpos] .= $rule[1]
@@ -902,6 +962,9 @@ class Berseker
 
 	protected function char( &$rule ): bool
 	{
+		if( $this->length <= $this->pos )
+			return false;
+
 		Logger::Log('  - [' . $this->readableCharArray($rule[1]) . '] is: "' .
 			$this->readableChar($this->data[$this->pos]) . '"' );
 
@@ -927,10 +990,14 @@ class Berseker
 
 	protected function echar( &$rule ): bool
 	{
+		if( $this->length <= $this->pos )
+			return false;
+
+		Logger::Log('  - [' . $this->readableCharArray($rule[1]) . '] is: "' .
+			$this->readableChar($this->data[$this->pos]) . '"' );
+
 		if( isset($rule[1][$this->data[$this->pos]]) )
 		{
-			echo $this->data[$this->pos] . ' => ' . $rule[1][$this->data[$this->pos]] . "\n";
-
 			if( $rule[1][$this->data[$this->pos]] !== false )
 				$this->run( $rule[1][$this->data[$this->pos++]] );
 			else
@@ -988,6 +1055,57 @@ class Berseker
 		return true;
 	}
 
+	protected function ueseek( &$rule ): bool
+	{
+		$escape = false;
+
+		while( $this->length > $this->pos )
+		{
+			// szukaj znaku ucieczki
+			if( $this->data[$this->pos] == $rule[2] )
+				$escape = !$escape;
+
+			// koniec
+			else if( $this->data[$this->pos] == $rule[1] && !$escape )
+			{
+				$this->pos++;
+				break;
+			}
+			
+			// i po znaku ucieczki
+			else
+				$escape = false;
+
+			$this->pos++;
+		}
+		return true;
+	}
+
+	protected function uereplace( &$rule ): bool
+	{
+		$escape = false;
+
+		while( $this->length > $this->pos )
+		{
+			// szukaj znaku ucieczki
+			if( $this->data[$this->pos] == $rule[2] )
+				$escape = !$escape;
+			// koniec
+			else if( $this->data[$this->pos] == $rule[1] && !$escape )
+			{
+				$this->pos++;
+				break;
+			}
+			else
+				$escape = false;
+
+			$this->data[$this->pos] = $rule[3];
+
+			$this->pos++;
+		}
+		return true;
+	}
+
 	protected function capture( &$rule ): bool
 	{
 		if( !preg_match($rule[1], $this->data, $matches, 0, $this->pos) )
@@ -1016,11 +1134,10 @@ class Berseker
 			return;
 		Logger::IndentInc();
 
-		$rule = &$this->rules[$point];
-		for( $x = 1; $x < $rule[0]; ++$x )
+		foreach( $this->rules[$point] as $val )
 		{
-			Logger::Log( "+ {$rule[$x][0]}" );
-			if( !$this->{$rule[$x][0]}($rule[$x]) )
+			Logger::Log( "+ {$val[0]}" );
+			if( !$this->{$val[0]}($val) )
 				break;
 		}
 
@@ -1060,10 +1177,10 @@ class Berseker
 
 $berseker = new Berseker( './test/moss/tst/array_test.c' );
 // $berseker = new Berseker( './test/main.c' );
-$berseker->Run();
+$berseker->run();
 // echo $berseker->data;
 
-print_r( $berseker->results );
+var_dump( $berseker->results );
 
 // $parser->ExtractScope( $content );
 // $parser->ParseElements();

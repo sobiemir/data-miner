@@ -1174,7 +1174,7 @@ MST_SUITE MSV_ArraySuite =
 
 // Inny komentarz z innej strony
 
-// Komentarz wielolioniowy \
+// Komentarz wielolioniowy \a\
 	Asadsad asdjas diosaj dio
 	int xacv() {
 		return 4; // zwróć coś
