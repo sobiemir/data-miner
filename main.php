@@ -5,15 +5,19 @@ class GroupElement
 {
 	public $content;
 	public $start;
+	public $startLine;
 	public $end;
+	public $endLine;
 	public $subgroups;
 
 	public function __construct()
 	{
-		$this->content = "";
-		$this->start = 0;
-		$this->end = 0;
+		$this->content   = "";
+		$this->start     = 0;
+		$this->end       = 0;
 		$this->subgroups = [];
+		$this->startLine = 0;
+		$this->endLine   = 0;
 	}
 }
 
@@ -26,10 +30,10 @@ class GroupData
 
 	public function __construct()
 	{
-		$this->name = '';
+		$this->name   = '';
 		$this->parent = null;
-		$this->group = null;
-		$this->pos = 0;
+		$this->group  = null;
+		$this->pos    = 0;
 	}
 }
 
@@ -45,6 +49,9 @@ class Berseker
 	private $groups = [];
 	private $gpos = -1;
 	private $gcontent = [];
+	private $linefeeds = [];
+	private $lfpos = 0;
+	private $lfcpos = 0;
 
 	public function __construct( string $file )
 	{
@@ -64,32 +71,8 @@ class Berseker
 
 		$this->rules = [
 			'ENTRY' => [
-				['execute', 'NEWLINE_UNIFICATION_START'],
-				['rewind', 0],
 				['loop', 'ENTRY_LOOP'],
 				['rewind', 0]
-			],
-			'NEWLINE_UNIFICATION_START' => [
-				['uaseek',
-					[
-						"\r" => false,
-						"\n" => false
-					],
-					false
-				],
-				// gdy CR+LF, zamieniaj na LF, w przeciwnym wypadku pozostaw jak jest
-				['next', "\r", false, true],
-				['seek', 1, false],
-				['next', "\n", false, true],
-				['seek', -1, false],
-				['loop', 'NEWLINE_UNIFICATION_CRLF']
-			],
-			'NEWLINE_UNIFICATION_CRLF' => [
-				['useek',
-					"\r",
-					false
-				],
-				['replace', ' ', false]
 			],
 			'ENTRY_LOOP' => [
 				['uaseek',
@@ -889,6 +872,9 @@ class Berseker
 				$group->group = &$group->parent[$rule[1]][0];
 			}
 
+			$group->group->start     = $this->pos;
+			$group->group->startLine = $this->getLineFromPosition($this->pos);
+
 			$group->name = $rule[1];
 		}
 		else if( $rule[1] )
@@ -898,6 +884,8 @@ class Berseker
 		else
 		{
 			// zapisz pobraną treść
+			$this->groups[$this->gpos]->group->end     = $this->pos;
+			$this->groups[$this->gpos]->group->endLine = $this->getLineFromPosition($this->pos);
 			$this->groups[$this->gpos]->group->content = $this->gcontent[$this->gpos];
 			$this->gpos--;
 		}
@@ -1115,8 +1103,6 @@ class Berseker
 			return true;
 		}
 
-		// echo $matches[0] . "\n";
-		
 		$this->pos += strlen( $matches[0] );
 		$this->results[] = $matches[0];
 
@@ -1126,9 +1112,6 @@ class Berseker
 	public function run( string $point = 'ENTRY' ): void
 	{
 		Logger::Log( "> {$point}" );
-
-		// for( $x = 0; $x < 1000000; ++$x)
-			// $x = $x - 2 + 3;
 
 		if( $this->length <= $this->pos )
 			return;
@@ -1142,6 +1125,25 @@ class Berseker
 		}
 
 		Logger::IndentDec();
+	}
+
+	// ZAMIENIA CR+LF i CR na samo LF
+	public function unificateLineEndings(): void
+	{
+		$this->linefeeds = [];
+		$this->linefeeds[] = -1;
+
+		for( $x = 0; $x < $this->length; ++$x )
+			if( $this->data[$x] == "\r" )
+			{
+				if( $this->data[$x + 1] == "\n" )
+					$this->data[$x++] = ' ';
+				else
+					$this->data[$x] = "\n";
+				$this->linefeeds[] = $x;
+			}
+			else if( $this->data[$x] == "\n" )
+				$this->linefeeds[] = $x;
 	}
 
 	public function readableChar( $chr )
@@ -1169,6 +1171,23 @@ class Berseker
 
 		return $retv;
 	}
+
+	public function getLineFromPosition( $pos )
+	{
+		if( $pos < $this->lfcpos )
+		{
+			for( ; $this->lfpos > 0; --$this->lfpos )
+				if( $pos > $this->linefeeds[$this->lfpos] )
+					return $this->lfpos;
+		}
+		else
+		{
+			for( $y = count($this->linefeeds); $this->lfpos < $y; ++$this->lfpos )
+				if( $pos <= $this->linefeeds[$this->lfpos] )
+					return $this->lfpos;
+		}
+		return 0;
+	}
 }
 
 // $parser = new Parser( './test/moss/tst/array_test.c' );
@@ -1177,10 +1196,11 @@ class Berseker
 
 $berseker = new Berseker( './test/moss/tst/array_test.c' );
 // $berseker = new Berseker( './test/main.c' );
-$berseker->run();
+
+$berseker->unificateLineEndings();
+$berseker->run('ENTRY');
+
 // echo $berseker->data;
-
 var_dump( $berseker->results );
-
 // $parser->ExtractScope( $content );
 // $parser->ParseElements();
