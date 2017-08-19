@@ -1,0 +1,29 @@
+
+{
+	"PREDEFINED": {
+		"MSD_HASH_MBS_FUNCTIONS": null,
+		"MSD_HASH_WCS_FUNCTIONS": null,
+		"MSD_HASH_MURMUR": null,
+		"MSD_HASH_JOAAT": null,
+		"MSD_HASH_FNV": null,
+		"MSD_HASH_SDBM": null,
+		"MSD_HASH_DJB": null,
+		"MSD_HASH_XXHASH": null,
+
+		"IGRET": null,
+		"IGVAR": null,
+
+		"MSD_SYSTEM_LINUX": null,
+		"MSD_COMPILER_GNUC": null,
+
+		"INLINE": "inline",
+
+		"TEST_PREDEFINED(_x,_y)": "ms_{:_x}_get_{:_y}"
+	},
+	"VARIABLES": {
+
+	},
+	"START": "ENTRY",
+	"STEPS": [
+	]
+}

@@ -1,12 +1,252 @@
-@ENTRYPOINT ENTRY
 
-#ENTRY
-	\EXECUTE NEWLINE_UNIFICATION_START
-	\REWIND 0
-	\LOOP ENTRY_LOOP
-	\REWIND 0
+% Stałe predefiniowane używane podczas pobierania symboli
+\PREDEFINED
+	#MSD_HASH_MBS_FUNCTIONS
+	#MSD_HASH_WCS_FUNCTIONS
 
-#NEWLINE_UNIFICATION_START
+	#MSD_HASH_MURMUR
+	#MSD_HASH_JOAAT
+	#MSD_HASH_FNV
+	#MSD_HASH_SDBM
+	#MSD_HASH_DJB
+	#MSD_HASH_XXHASH
 
-#ENTRY_LOOP
+	#IGRET
+	#IGVAR
 
+	#MSD_SYSTEM_LINUX
+	#MSD_COMPILER_GNUC
+
+	#INLINE inline
+
+	#TEST_PREDEFINED(_x,_y) ms_{:_x}_get_{:_y}
+
+% Lista zmiennych dostępnych podczas działania parsera
+#VARIABLES
+
+% Nazwa punktu wejściowego
+\START ENTRY
+
+% Kroki według których parsowany będzie plik
+#STEPS
+
+	% Punkt wejściowy
+	@ENTRY
+		@>LOOP
+			PREPARE_TEXT
+		@>REWIND
+			0
+
+	% Przygotowywanie tekstu pod parsowanie
+	@PREPARE_TEXT
+		@>SEEK
+			#UNTIL
+				\"/" FALSE
+				\'"' FALSE
+				\"'" FALSE
+			FALSE
+		@CHAR
+			#WHEN
+				\"/" COMMENT
+				\'"' SKIP_CONTENT_DOUBLE
+				\"'" SKIP_CONTENT_SINGLE
+			FALSE
+
+	% Usuwa ciągi znaków zapisane w apostrofie
+	@SKIP_CONTENT_DOUBLE
+		@ESCAPE_REPLACE
+			'"'
+			"\\"
+			" "
+
+	% Usuwa ciągi znaków zapisane w apostrofie
+	@SKIP_CONTENT_SINGLE
+		@ESCAPE_REPLACE_UNTIL,
+			"'"
+			"\\"
+			" "
+
+	% Wykrywa typ komentarza
+	@COMMENT
+		@CHAR
+			#WHEN
+				\"/" COMMENT_LINE_START
+				\"*" COMMENT_BLOCK_START
+			FALSE
+
+	% Początek komentarza blokowego
+	@COMMENT_BLOCK_START
+		@GROUP
+			COMMENT_BLOCK
+		@SEEK
+			-2
+			FALSE
+		@REPLACE
+			" "
+			FALSE
+		@REPLACE
+			" "
+			FALSE
+		@EXECUTE
+			COMMENT_BLOCK
+		@GROUP
+			FALSE
+
+	% Komentarz blokowy
+	@COMMENT_BLOCK
+		@REPLACE
+			#UNTIL
+				\"\n" FALSE
+				\"*"  FALSE
+			" ",
+			FALSE
+		@NEXT
+			"*"
+			COMMENT_BLOCK_END_PREPARE
+			FALSE
+		@REPLACE
+			" "
+			TRUE
+		@EXECUTE
+			COMMENT_BLOCK
+
+	# Przygotowanie do zakończenia komentarza blokowego
+	COMMENT_BLOCK_END_PREPARE: [
+		[NEXT,
+			"/",
+			COMMENT_BLOCK_END,
+			false
+		],
+		[SEEK,
+			-1,
+			false
+		],
+		[REPLACE,
+			' ',
+			true
+		],
+		[EXECUTE,
+			COMMENT_BLOCK
+		]
+	],
+
+	# 
+	# Zakończenie komentarza blokowego.
+	# Podczas zakończenia komentarza blokowego parser musi wyczyścić jego zakończenie, czyli */.
+	# Po wykonaniu tego, reguła wraca do reguły z której została wywołana.
+	# ---------------------------------------------------------------------------------------------
+	COMMENT_BLOCK_END: [
+		[SEEK,
+			-2,
+			false
+		],
+		[REPLACE,
+			' ',
+			false
+		],
+		[REPLACE',
+			' ',
+			false
+		]
+	],
+
+	# 
+	# Rozpoczęcie komentarza liniowego.
+	# Po wykryciu komentarza parser musi wyczyścić również sam początek, czyli znaki //.
+	# Po wykonaniu tej czynnności, przechodzi do kroku głównego pobierania komentarza.
+	# ---------------------------------------------------------------------------------------------
+	COMMENT_LINE_START: [
+		[GROUP,
+			COMMENT_LINE
+		],
+		[SEEK,
+			-1,
+			false
+		],
+		[REPLACE,
+			" ",
+			false
+		],
+		[EXECUTE,
+			COMMENT_LINE
+		],
+		[GROUP,
+			false
+		]
+	],
+
+	# 
+	# Kontynuacja komentarza liniowego po znaku ucieczki (wieloliniowy komentarz liniowy)
+	# Jest to możliwe dzięki zastosowaniu takiego sposobu:
+	#
+	# // komentarz liniowy \
+	#    jednak w dwóch liniach
+	#
+	# Taki komentarz, choć w wielu liniach, traktowany będzie nadal jako liniowy.
+	# ---------------------------------------------------------------------------------------------
+	COMMENT_LINE_CONTINUE: [
+		[SEEK,
+			-1,
+			false
+		],
+		[WRITE,
+			false
+		],
+		[EXECUTE,
+			COMMENT_LINE
+		]
+	],
+
+
+	# 
+	# Komentarz liniowy.
+	# Szuka znaku końca linii lub znaku ucieczki, pobierając komentarz do grupy i zamieniając go
+	# pustymi znakami.
+	# Wyszukuje tylko linuksowych znaków końca linii.
+	# ---------------------------------------------------------------------------------------------
+	COMMENT_LINE': [
+		[SEEK,
+			-2,
+			false
+		],
+		[REPLACE,
+			" ",
+			false
+		],
+		[SEEK,
+			1,
+			false
+		],
+		[UAREPLACE, [
+				"\\": false,
+				"\n": false 
+			],
+			" ",
+			true
+		],
+		[NEXT,
+			"\\",
+			false,
+			true
+		],
+		[REPLACE,
+			" ",
+			false
+		],
+		[NEXT,
+			"\n",
+			COMMENT_LINE_CONTINUE,
+			false
+		],
+		[WRITE,
+			"\\"
+		],
+		[EXECUTE,
+			COMMENT_LINE
+		]
+	],
+
+	CAPTURE_DATA: [
+		[WHITESPACE, true]
+	]
+}

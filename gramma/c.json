@@ -1,0 +1,217 @@
+{
+	"PREDEFINED": {
+		"MSD_HASH_MBS_FUNCTIONS": "",
+		"MSD_HASH_WCS_FUNCTIONS": "",
+
+		"MSD_HASH_MURMUR": "",
+		"MSD_HASH_JOAAT":  "",
+		"MSD_HASH_FNV":    "",
+		"MSD_HASH_SDBM":   "",
+		"MSD_HASH_DJB":    "",
+		"MSD_HASH_XXHASH": "",
+
+		"IGRET": "",
+		"IGVAR": "",
+
+		"MSD_SYSTEM_LINUX":  "",
+		"MSD_COMPILER_GNUC": "",
+
+		"INLINE": "inline",
+
+		"TEST_PREDEFINED": {
+			"arguments": [
+				"_x",
+				"_y"
+			],
+			"replace": "ms_{:_x}_get_{:_y}"
+		}
+	},
+	"VARIABLES": null,
+	"START": "ENTRY",
+	"STEPS": {
+		"ENTRY": [
+			["LOOP",
+				"PREPARE_TEXT"
+			],
+			["REWIND",
+				0
+			]
+		],
+		"PREPARE_TEXT": [
+			["SEEK_UNTIL_ONE_OF", {
+					"/":  false,
+					"\"": false,
+					"'":  false
+				},
+				false
+			],
+			["CHAR_CHECK", {
+					"/":  "COMMENT",
+					"\"": "SKIP_CONTENT_DOUBLE",
+					"'":  "SKIP_CONTENT_SINGLE"
+				},
+				false
+			]
+		],
+		"SKIP_CONTENT_DOUBLE": [
+			["STORAGE", "DOUBLE_QUOTE"],
+			["REPLACE_UNTIL_ESCAPE",
+				"\"",
+				" ",
+				"\\",
+				true
+			],
+			["STORAGE", false]
+		],
+		"SKIP_CONTENT_SINGLE": [
+			["STORAGE", "SINGLE_QUOTE"],
+			["REPLACE_UNTIL_ESCAPE",
+				"'",
+				" ",
+				"\\",
+				true
+			],
+			["STORAGE", false]
+		],
+		"COMMENT": [
+			["CHAR", {
+					"/": "COMMENT_LINE_START",
+					"*": "COMMENT_BLOCK_START"
+				},
+				false
+			]
+		],
+		"COMMENT_BLOCK_START": [
+			["GROUP",
+				"COMMENT_BLOCK"
+			],
+			["SEEK",
+				-2
+			],
+			["REPLACE_MANY",
+				2,
+				" ",
+				false
+			],
+			["EXECUTE",
+				"COMMENT_BLOCK"
+			],
+			["GROUP",
+				false
+			]
+		],
+		"COMMENT_BLOCK": [
+			["REPLACE_UNTIL_ONE_OF", {
+					"\n": false,
+					"*" : false
+				},
+				" ",
+				true
+			],
+			["NEXT",
+				"*",
+				"COMMENT_BLOCK_END_PREPARE",
+				false
+			],
+			["SEEK_GET",
+				1
+			],
+			["EXECUTE",
+				"COMMENT_BLOCK"
+			]
+		],
+		"COMMENT_BLOCK_END_PREPARE": [
+			["NEXT",
+				"/",
+				"COMMENT_BLOCK_END",
+				false
+			],
+			["SEEK",
+				-1
+			],
+			["REPLACE",
+				" ",
+				true
+			],
+			["EXECUTE",
+				"COMMENT_BLOCK"
+			]
+		],
+		"COMMENT_BLOCK_END": [
+			["SEEK",
+				-2
+			],
+			["REPLACE_MANY",
+				2,
+				" ",
+				false
+			]
+		],
+		"COMMENT_LINE_START": [
+			["GROUP",
+				"COMMENT_LINE"
+			],
+			["SEEK",
+				-1
+			],
+			["REPLACE",
+				" ",
+				false
+			],
+			["EXECUTE",
+				"COMMENT_LINE"
+			],
+			["GROUP",
+				false
+			]
+		],
+		"COMMENT_LINE_CONTINUE": [
+			["SEEK",
+				-1
+			],
+			["WRITE_FROM_STREAM"],
+			["EXECUTE",
+				"COMMENT_LINE"
+			]
+		],
+		"COMMENT_LINE": [
+			["SEEK",
+				-2
+			],
+			["REPLACE",
+				" ",
+				false
+			],
+			["SEEK",
+				1
+			],
+			["REPLACE_UNTIL_ONE_OF", {
+					"\\": false,
+					"\n" : false
+		 		},
+				" ",
+				true
+			],
+			["NEXT",
+				"\\",
+				false,
+				" "
+			],
+			["REPLACE",
+				" ",
+				false
+			],
+			["NEXT",
+				"\n",
+				"COMMENT_LINE_CONTINUE",
+				false
+			],
+			["WRITE",
+				"\\"
+			],
+			["EXECUTE",
+				"COMMENT_LINE"
+			]
+		]
+	}
+}
