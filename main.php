@@ -1,6 +1,5 @@
 <?php
 require_once( "./logger.php" );
-require_once( "./yaml/Spyc.php" );
 
 class GroupElement
 {
@@ -26,15 +25,17 @@ class GroupData
 {
 	public $name;
 	public $group;
-	public $pos;
+	public $elements;
 	public $parent;
+	public $pos;
 
 	public function __construct()
 	{
-		$this->name   = '';
-		$this->parent = null;
-		$this->group  = null;
-		$this->pos    = 0;
+		$this->name     = '';
+		$this->group    = new GroupElement();
+		$this->elements = [];
+		$this->parent   = null;
+		$this->pos      = 0;
 	}
 }
 
@@ -56,37 +57,7 @@ class Berseker
 	public $lfcpos = 0;
 	public $lastgpos = 0;
 
-	public $mappings = [
-		'REWIND'               => [[            ], 'Rewind',            1, [-1            ]],
-		'LOOP'                 => [[            ], 'Loop',              1, [-1            ]],
-		'EXECUTE'              => [[            ], 'Execute',           1, [-1            ]],
-		'SEEK'                 => [[false       ], 'Seek',              2, [-1,  0        ]],
-		'SEEK_GET'             => [[true        ], 'Seek',              2, [-1,  0        ]],
-		'SEEK_UNTIL'           => [[false       ], 'SeekUntil',         3, [-1, -1,  0    ]],
-		'SEEK_UNTIL_ESCAPE'    => [[            ], 'SeekUntil',         3, [-1, -1, -1    ]],
-		'SEEK_UNTIL_ONE_OF'    => [[            ], 'SeekUntilOneOf',    2, [-1, -1,       ]],
-		'SEEK_BLOCK'           => [[false       ], 'SeekBlock',         3, [-1, -1,  0    ]],
-		'SEEK_BLOCK_GET'       => [[true        ], 'SeekBlock',         3, [-1, -1,  0    ]],
-		'CHAR_CHECK'           => [[true        ], 'Char',              3, [-1, -1,  0    ]],
-		'CHAR'                 => [[false       ], 'Char',              3, [-1, -1,  0    ]],
-		'STRING'               => [[false       ], 'String',            4, [-1, -1, -1,  0]],
-		'STRING_CHECK'         => [[true        ], 'String',            4, [-1, -1, -1,  0]],
-		'GROUP'                => [[            ], 'Group',             1, [-1            ]],
-		'STORAGE'              => [[            ], 'Storage',           1, [-1            ]],
-		'REPLACE'              => [[  1         ], 'Replace',           3, [ 0, -1, -1    ]],
-		'REPLACE_MANY'         => [[            ], 'Replace',           3, [-1, -1, -1,   ]],
-		'REPLACE_UNTIL'        => [[true        ], 'ReplaceUntil',      4, [-1, -1,  0, -1]],
-		'REPLACE_UNTIL_ESCAPE' => [[            ], 'ReplaceUntil',      4, [-1, -1, -1, -1]],
-		'RUN_PREPROCESSOR'     => [[            ], 'RunPreprocessor',   0, [              ]], 
-		'REPLACE_UNTIL_ONE_OF' => [[            ], 'ReplaceUntilOneOf', 3, [-1, -1, -1    ]],
-		'NEXT'                 => [[false       ], 'Next',              4, [-1, -1, -1,  0]],
-		'NEXT_CHECK'           => [[true        ], 'Next',              4, [-1, -1, -1,  0]],
-		'WRITE'                => [[            ], 'Write',             1, [-1            ]],
-		'WRITE_FROM_STREAM'    => [[false       ], 'Write',             1, [ 0            ]],
-		'WHITECHAR'            => [[false, false], 'WhiteChar',         2, [ 0,  0        ]],
-		'WHITECHAR_ESCAPE'     => [[false, true ], 'WhiteChar',         2, [ 0,  0        ]],
-		'WHITESPACE'           => [[true,  true ], 'WhiteChar',         2, [ 0,  0        ]]
-	];
+	public $mappings = [];
 
 	public function __construct( string $file )
 	{
@@ -101,226 +72,14 @@ class Berseker
 		$this->gpos   = 0;
 
 		// wskaźnik na główną strukturę
-		$this->groups[] = new GroupData( '', null, 0 );
-		$this->groups[0]->parent = &$this->storage;
-		$this->groups[] = new GroupData( '', null, 0 );
-		$this->groups[1]->parent = &$this->results;
+		$this->groups[] = new GroupData();
+		$this->groups[0]->elements = &$this->storage;
+		$this->groups[] = new GroupData();
+		$this->groups[1]->elements = &$this->results;
+
+		$this->mappings = json_decode( file_get_contents('./mappings.json'), true );
 
 		$this->rules = [];
-
-
-			// // reguła wejściowa
-			// 'entry' => [
-			// 	5,
-			// 	// pomija białe znaki
-			// 	['whitespace', true],
-			// 	// porównuje znak i przechodzi do reguły podanej po znaku
-			// 	// ta wersja kontynuuje działanie reguły po wykonaniu makra
-			// 	['echar', 
-			// 		[
-			// 			'#' => 'macro',
-			// 			'/' => 'comment'
-			// 		],
-			// 		// reguła wykonywana w przeciwnym razie lub false
-			// 		'symbol'
-			// 	],
-			// 	// przechodzi do podanej reguły
-			// 	['goto', 'entry']
-			// ],
-
-			// 'macro' => [
-			// 	3,
-			// 	['whitespace', true],
-			// 	// porównuje pobrany ciąg znaków z podanymi i przechodzi do reguły podanej po ciągu
-			// 	['string', 
-			// 		// regex używany do pobrania ciągu z tekstu
-			// 		'/[a-z]+/A',
-			// 		[
-			// 			'include' => 'macro_include',
-			// 			'define' => 'macro_define'
-			// 		],
-			// 		// reguła wykonywana w przeciwnym razie lub false
-			// 		'skip_line'
-			// 	]
-			// ],
-			
-			// 'macro_include' => [
-			// 	3,
-			// 	['whitespace', true],
-			// 	// to samo co echar z tą różnicą że po wykonaniu reguły obecna jest przerywana
-			// 	['char',
-			// 		[
-			// 			'<' => 'macro_include_file',
-			// 			'"' => 'macro_include_file'
-			// 		],
-			// 		'skip_line'
-			// 	]
-			// ],
-
-			// 'macro_include_file' => [
-			// 	3,
-			// 	// zapisuje do kolekcji pobrany ciąg
-			// 	['capture',
-			// 		'/[^">\r\n]+/A',
-			// 		// w przypadku gdy program nie znajdzie dopasowania, wykonana zostanie podana tutaj reguła
-			// 		// false nie wykonuje żadnej reguły
-			// 		false
-			// 	],
-			// 	['goto', 'skip_line']
-			// ],
-
-			// 'macro_define' => [
-			// 	4,
-			// 	['whitespace', true],
-			// 	['capture',
-			// 		'/[a-zA-Z_$][a-zA-Z0-9_$]*/A',
-			// 		false
-			// 	],
-			// 	// sprawdza czy następny znak jest równy podanemu i wykonuje jedną z podanych
-			// 	// reguł w zależności czy sprawdzenie się powiodło czy nie
-			// 	['next',
-			// 		'(',
-			// 		'macro_define_param',
-			// 		'skip_line'
-			// 	]
-			// ],
-
-			// 'macro_define_param' => [
-			// 	5,
-			// 	['whitespace', true],
-			// 	['capture',
-			// 		'/[a-zA-Z_$][a-zA-Z0-9_$]*/A',
-			// 		false
-			// 	],
-			// 	['whitespace', true],
-			// 	['next',
-			// 		',',
-			// 		'macro_define_param',
-			// 		'skip_line'
-			// 	]
-			// ],
-
-			// // pomijanie linii
-			// 'skip_line' => [
-			// 	4,
-			// 	// pomija dane aż do napotkania jednego z podanych znaków
-			// 	// tru pobiera znak, false pozostawia (uskip - until skip)
-			// 	['uskip', [
-			// 		'\\' => false,
-			// 		"\r" => false,
-			// 		"\n" => false
-			// 	]],
-			// 	// przerywa dalsze działanie gdy znak nie jest równy podanemu
-			// 	// gdy jest, pobiera go (ibchar - inverse break char)
-			// 	['ibchar', '\\'],
-			// 	// jeżeli kolejnym znakiem jest znak nowej linii, to goto skip_line
-			// 	['char',
-			// 		[
-			// 			"\r" => 'skip_line',
-			// 			"\n" => 'skip_line'
-			// 		],
-			// 		false
-			// 	]
-			// ],
-
-			// 'symbol' => [
-			// 	5,
-			// 	['whitespace', true],
-			// 	['capture',
-			// 		'/[a-zA-Z_$][a-zA-Z0-9_$]*/A',
-			// 		'symbol_skip'
-			// 	],
-			// 	['whitespace', true],
-			// 	['char',
-			// 		[
-			// 			'(' => 'symbol_params',
-			// 			';' => false,
-			// 			'=' => 'symbol_skip',
-			// 			'{' => 'symbol_inner_symbol'
-			// 		],
-			// 		'symbol'
-			// 	]
-			// ],
-
-			// 'symbol_inner_symbol' => [
-			// 	5,
-			// 	['whitespace', true],
-			// 	['capture',
-			// 		'/[a-zA-Z_$][a-zA-Z0-9_$]*/A',
-			// 		'symbol_skip'
-			// 	],
-			// 	['whitespace', true],
-			// 	['char',
-			// 		[
-			// 			'*' => 'symbol_inner_pointer',
-			// 			';' => 'symbol_inner_symbol'
-			// 		],
-			// 		'symbol_inner_symbol'
-			// 	]
-			// ],
-
-			// 'symbol_skip' => [
-			// 	3,
-			// 	['uskip', [
-			// 		';' => false,
-			// 		',' => false,
-			// 		'{' => false
-			// 	]],
-			// 	['char',
-			// 		[
-			// 			',' => false,
-			// 			';' => false,
-			// 			'{' => false
-			// 		],
-			// 		false
-			// 	]
-			// ],
-
-			// 'symbol_body_recognize' => [
-			// 	3,
-			// 	['whitespace', true],
-			// 	['next',
-			// 		'{',
-			// 		'symbol_body_skip',
-			// 		'symbol_skip'
-			// 	]
-			// ],
-
-			// 'symbol_body_skip' => [
-			// 	2,
-			// 	// deep skip
-			// 	// pomijanie znaków do napotkania najbardziej zewnętrznego znaku zamykającego obszar
-			// 	// porównuje poziomy i zamyka w odpowiednim momencie
-			// 	['dskip', '{', '}']
-			// ],
-
-			// 'symbol_params' => [
-			// 	5,
-			// 	['whitespace', true],
-			// 	['char',
-			// 		[
-			// 			'*' => 'symbol_pointer',
-			// 			',' => 'symbol_params',
-			// 			')' => 'symbol_body_recognize'
-			// 		],
-			// 		false
-			// 	],
-			// 	['capture',
-			// 		'/[a-zA-Z_$][a-zA-Z0-9_$]*/A',
-			// 		'symbol_skip'
-			// 	],
-			// 	['goto', 'symbol_params']
-			// ],
-
-			// 'symbol_pointer' => [
-			// 	2,
-			// 	['goto', 'symbol_params']
-			// ],
-
-			// 'symbol_inner_pointer' => [
-			// 	2,
-			// 	['goto', 'symbol_inner_symbol']
-			// ]
 	}
 
 	/**
@@ -353,7 +112,7 @@ class Berseker
 			? $this->pos + $rule[1]
 			: $rule[1];
 
-		// Logger::Log( "  - rewind caret to: {$this->pos}" );
+		Logger::Log( "  - rewind caret to: {$this->pos}" );
 		return true;
 	}
 
@@ -382,17 +141,17 @@ class Berseker
 
 		while( $isrun )
 		{
-			// Logger::Log( "> {$rule[1]}" );
+			Logger::Log( "> {$rule[1]}" );
 
 			// sprawdź czy nie przekroczono zakresu ciągu
 			if( $this->length <= $this->pos )
 				break;
-			// Logger::IndentInc();
+			Logger::IndentInc();
 
 			// wywołuj operacje zapisane w regule
 			foreach( $lrule as $val )
 			{
-				// Logger::Log( "+ {$val[0]}" );
+				Logger::Log( "+ {$val[0]}" );
 				if( !$this->{$val[0]}($val) )
 				{
 					$isrun = false;
@@ -400,7 +159,7 @@ class Berseker
 				}
 			}
 
-			// Logger::IndentDec();
+			Logger::IndentDec();
 		}
 		return true;
 	}
@@ -451,18 +210,18 @@ class Berseker
 	 */
 	protected function Seek( array &$rule ): bool
 	{
-		// Logger::Log(
-			// "  - [{$rule[1]} : \"" .
-				// $this->ReadableChar($this->data[$this->pos + $rule[1]]) .
-				// "\"] from [{$this->pos} : \"" .
-				// $this->ReadableChar($this->data[$this->pos]) .
-			// "\"]"
-		// );
+		Logger::Log(
+			"  - [{$rule[1]} : \"" .
+				$this->ReadableChar($this->data[$this->pos + $rule[1]]) .
+				"\"] from [{$this->pos} : \"" .
+				$this->ReadableChar($this->data[$this->pos]) .
+			"\"]"
+		);
 
 		// zapis danych do grupy
 		if( $rule[2] )
 		{
-			// Logger::Log( "  - save data to current group" );
+			Logger::Log( "  - save data to current group" );
 			if( $rule[1] > 0 )
 				$this->gcontent[$this->gpos] .= substr( $this->data, $this->pos, $rule[1] );
 			else
@@ -506,24 +265,40 @@ class Berseker
 	 */
 	protected function SeekUntil( array &$rule ): bool
 	{
-		// Logger::Log('  - seek until "' . $this->ReadableChar($rule[1]) . '"' );
+		Logger::Log('  - seek until "' . $this->ReadableChar($rule[1]) . '"' );
 
 		// przewijaj i pobieraj znaki
 		if( $rule[3] )
+		{
 			while( $this->length > $this->pos && $this->data[$this->pos] != $rule[1] )
 			{
 				if( $this->data[$this->pos] == $rule[2] && $this->data[$this->pos] == $rule[1] )
 					$this->pos++;
 				$this->gcontent[$this->gpos] .= $this->data[$this->pos++];
 			}
+		}
 		// tylko przewijaj
 		else
-			while( $this->length > $this->pos && $this->data[$this->pos] != $rule[1] )
+		{
+			if( $rule[2] )
 			{
-				if( $this->data[$this->pos] == $rule[2] && $this->data[$this->pos] == $rule[1] )
+				$escape = false;
+				while( $this->length > $this->pos )
+				{
+					if( $this->data[$this->pos] == $rule[1] && !$escape )
+						break;
+					else if( $this->data[$this->pos] == $rule[2] )
+						$escape = !$escape;
+					else
+						$escape = false;
+
 					$this->pos++;
-				$this->pos++;
+				}
 			}
+			else
+				while( $this->length > $this->pos && $this->data[$this->pos] != $rule[1] )
+					$this->pos++;
+		}
 		$this->pos++;
 
 		if( $this->length <= $this->pos )
@@ -575,7 +350,7 @@ class Berseker
 	 */
 	protected function SeekUntilOneOf( array &$rule ): bool
 	{
-		// Logger::Log('  - seek until one of [' . $this->ReadableCharArray($rule[1]) . ']' );
+		Logger::Log('  - seek until one of [' . $this->ReadableCharArray($rule[1]) . ']' );
 
 		// przewijaj i pobieraj znaki
 		if( $rule[2] )
@@ -647,7 +422,7 @@ class Berseker
 				}
 				$deep--;
 			}
-			if( $rule[4] )
+			if( $rule[3] )
 				$this->gcontent[$this->gpos] .= $this->data[$this->pos];
 			$pos++;
 		}
@@ -682,18 +457,18 @@ class Berseker
 	 */
 	protected function Replace( array &$rule ): bool
 	{
-		// Logger::Log(
-			// "  - to [{$rule[1]} : \"" .
-				// $this->ReadableChar($this->data[$this->pos + $rule[1]]) .
-				// "\"] from [{$this->pos} : \"" .
-				// $this->ReadableChar($this->data[$this->pos]) .
-			// "\"]"
-		// );
+		Logger::Log(
+			"  - to [{$rule[1]} : \"" .
+				$this->ReadableChar($this->data[$this->pos + $rule[1]]) .
+				"\"] from [{$this->pos} : \"" .
+				$this->ReadableChar($this->data[$this->pos]) .
+			"\"]"
+		);
 
 		// zapisz dane do grupy
 		if( $rule[3] )
 		{
-			// Logger::Log( "  - save data to current group" );
+			Logger::Log( "  - save data to current group" );
 
 			if( $rule[1] == 1 )
 				$this->gcontent[$this->gpos] .= $this->data[$this->pos];
@@ -702,7 +477,7 @@ class Berseker
 		}
 
 		// przesuń i zamieniaj znaki na te podane w argumencie
-		// Logger::Log( "  - replace all values to: {$rule[2]}" );
+		Logger::Log( "  - replace all values to: {$rule[2]}" );
 
 		if( $rule[1] == 1 )
 			$this->data[$this->pos++] = $rule[2];
@@ -755,13 +530,13 @@ class Berseker
 	 */
 	protected function ReplaceUntil( array &$rule ): bool
 	{
-		// Logger::Log( '  - "' . $this->ReadableChar($rule[2]) . '" untill "' .
-			// $this->ReadableChar($rule[1]) . '"' );
+		Logger::Log( '  - "' . $this->ReadableChar($rule[2]) . '" untill "' .
+			$this->ReadableChar($rule[1]) . '"' );
 
 		// pobieraj znaki i zamieniaj je
 		if( $rule[4] )
 		{
-			// Logger::Log( '  - save data to current group' );
+			Logger::Log( '  - save data to current group' );
 
 			while( $this->length > $this->pos && $this->data[$this->pos] != $rule[1] )
 			{
@@ -835,8 +610,8 @@ class Berseker
 	 */
 	protected function ReplaceUntilOneOf( array &$rule ): bool
 	{
-		// Logger::Log( '  - "' . $this->ReadableChar($rule[2]) . '" untill one of [' .
-			// $this->ReadableCharArray($rule[1]) . ']' );
+		Logger::Log( '  - "' . $this->ReadableChar($rule[2]) . '" untill one of [' .
+			$this->ReadableCharArray($rule[1]) . ']' );
 
 		// pobieraj znaki i zamieniaj je
 		if( $rule[3] )
@@ -983,90 +758,42 @@ class Berseker
 	{
 		if( $rule[1] )
 		{
-			// Logger::Log( "  - enter to temporary storage" );
-
 			$this->lastgpos = $this->gpos;
 			$this->gpos     = 0;
 
-			$group = &$this->groups[0];
-			$this->gcontent[0] = '';
+			$group = &$this->groups[$this->gpos];
 
-			if( isset($group->parent[$rule[1]]) )
-			{
-				$group->parent[$rule[1]][] = new GroupElement();
-
-				$group->pos   = count( $group->parent[$rule[1]] ) - 1;
-				$group->group = &$group->parent[$rule[1]][$group->pos];
-			}
+			// dodaj nowy element lub stwórz tablicę z nowym elementem
+			if( isset($group->elements[$rule[1]]) )
+				$group->elements[$rule[1]][] = new GroupElement();
 			else
-			{
-				$group->parent[$rule[1]] = [new GroupElement()];
+				$group->elements[$rule[1]] = [new GroupElement()];
+			
+			$this->gcontent[$this->gpos] = '';
 
-				$group->pos   = 0;
-				$group->group = &$group->parent[$rule[1]][0];
-			}
+			// pobierz aktualny element grupy
+			$group->name  = $rule[1];
+			$group->pos   = count( $group->elements[$rule[1]] ) - 1;
+			$group->group = &$group->elements[$rule[1]][$group->pos];
 
+			// zapisz pozycję i linię startu
 			$group->group->start     = $this->pos;
 			$group->group->startLine = $this->GetLineFromPosition( $this->pos );
-
-			$group->name = $rule[1];
 		}
+		// wyjście z grupy
 		else
 		{
-			// Logger::Log( "  - exit from temporary storage" );
+			// nie ma z czego wychodzić
+			if( $this->gpos != 0 )
+				return true;
 
 			// zapisz pobraną treść
-			$this->groups[0]->group->end     = $this->pos;
-			$this->groups[0]->group->endLine = $this->GetLineFromPosition( $this->pos );
-			$this->groups[0]->group->content = $this->gcontent[0];
+			$this->groups[$this->gpos]->group->end     = $this->pos;
+			$this->groups[$this->gpos]->group->endLine = $this->GetLineFromPosition( $this->pos );
+			$this->groups[$this->gpos]->group->content = $this->gcontent[$this->gpos];
+			
 			$this->gpos = $this->lastgpos;
 		}
-
-		// // główna grupa (grupy w głównym obiekcie)
-		// if( $rule[1] && $this->gpos < 0 )
-		// {
-		// 	$this->gpos++;
-
-		// 	$group = &$this->groups[$this->gpos];
-		// 	$this->gcontent[$this->gpos] = '';
-
-		// 	if( isset($group->parent[$rule[1]]) )
-		// 	{
-		// 		$group->parent[$rule[1]][] = new GroupElement();
-
-		// 		$group->pos   = count( $group->parent[$rule[1]] ) - 1;
-		// 		$group->group = &$group->parent[$rule[1]][$group->pos];
-		// 	}
-		// 	else
-		// 	{
-		// 		$group->parent[$rule[1]] = [new GroupElement()];
-
-		// 		$group->pos   = 0;
-		// 		$group->group = &$group->parent[$rule[1]][0];
-		// 	}
-
-		// 	$group->group->start     = $this->pos;
-		// 	$group->group->startLine = $this->GetLineFromPosition($this->pos);
-
-		// 	$group->name = $rule[1];
-		// }
-		// // podgrupa
-		// else if( $rule[1] )
-		// {
-		// }
-		// // wyjście z grupy
-		// else
-		// {
-		// 	// nie ma z czego wychodzić
-		// 	if( $this->gpos == -1 )
-		// 		return true;
-
-		// 	// zapisz pobraną treść
-		// 	$this->groups[$this->gpos]->group->end     = $this->pos;
-		// 	$this->groups[$this->gpos]->group->endLine = $this->GetLineFromPosition($this->pos);
-		// 	$this->groups[$this->gpos]->group->content = $this->gcontent[$this->gpos];
-		// 	$this->gpos--;
-		// }
 
 		return true;
 	}
@@ -1098,41 +825,53 @@ class Berseker
 	 */
 	protected function Group( array &$rule ): bool
 	{
-		// if( $rule[1] )
-			// Logger::Log( "  - enter to: {$rule[1]}" );
-		// else
-			// Logger::Log( "  - exit from: {$this->groups[$this->gpos]->name}" );
+		if( $rule[1] )
+			Logger::Log( "  - enter to: {$rule[1]}" );
+		else
+			Logger::Log( "  - exit from: {$this->groups[$this->gpos]->name}" );
 
-		// główna grupa (grupy w głównym obiekcie)
-		if( $rule[1] && $this->gpos < 1 )
+		// wejście do grupy
+		if( $rule[1] )
 		{
-			$group = &$this->groups[++$this->gpos];
-			$this->gcontent[$this->gpos] = '';
+			++$this->gpos;
+			if( $this->gpos < 1 )
+				$this->gpos = 1;
 
-			if( isset($group->parent[$rule[1]]) )
+			// dodaj pozycję gdy nie istnieje
+			if( !isset($this->groups[$this->gpos]) )
+				$this->groups[$this->gpos] = new GroupData();
+
+			$group = &$this->groups[$this->gpos];
+
+			// przypisz rodzica i elementy
+			if( $this->gpos == 1 )
 			{
-				$group->parent[$rule[1]][] = new GroupElement();
-
-				$group->pos   = count( $group->parent[$rule[1]] ) - 1;
-				$group->group = &$group->parent[$rule[1]][$group->pos];
+				$group->parent   = null;
+				$group->elements = &$this->results;
 			}
 			else
 			{
-				$group->parent[$rule[1]] = [new GroupElement()];
+				$group->parent   = &$this->groups[$this->gpos - 1]->group;
+				$group->elements = &$this->groups[$this->gpos - 1]->group->subGroups;
 
-				$group->pos   = 0;
-				$group->group = &$group->parent[$rule[1]][0];
 			}
 
+			// dodaj nowy element lub stwórz tablicę z nowym elementem
+			if( isset($group->elements[$rule[1]]) )
+				$group->elements[$rule[1]][] = new GroupElement();
+			else
+				$group->elements[$rule[1]] = [new GroupElement()];
+
+			$this->gcontent[$this->gpos] = '';
+
+			// pobierz aktualny element grupy
+			$group->name  = $rule[1];
+			$group->pos   = count( $group->elements[$rule[1]] ) - 1;
+			$group->group = &$group->elements[$rule[1]][$group->pos];
+
+			// zapisz pozycję i linię startu
 			$group->group->start     = $this->pos;
 			$group->group->startLine = $this->GetLineFromPosition( $this->pos );
-
-			$group->name = $rule[1];
-		}
-		// podgrupa
-		else if( $rule[1] )
-		{
-
 		}
 		// wyjście z grupy
 		else
@@ -1141,11 +880,19 @@ class Berseker
 			if( $this->gpos < 1 )
 				return true;
 
-			// zapisz pobraną treść
-			$this->groups[$this->gpos]->group->end     = $this->pos;
-			$this->groups[$this->gpos]->group->endLine = $this->GetLineFromPosition( $this->pos );
-			$this->groups[$this->gpos]->group->content = $this->gcontent[$this->gpos];
+			$group = &$this->groups[$this->gpos];
+
+			$group->group->end     = $this->pos;
+			$group->group->endLine = $this->GetLineFromPosition( $this->pos );
+			$group->group->content = $this->gcontent[$this->gpos];
+
+			if( $this->gcontent[$this->gpos] == '' && count($group->group->subGroups) == 0 )
+				array_pop( $this->groups[$this->gpos - 1]->group->subGroups[$group->name] );
+
 			$this->gpos--;
+
+			if( $this->gpos != 1 )
+				array_pop( $this->groups );
 		}
 
 		return true;
@@ -1172,26 +919,54 @@ class Berseker
 	}
 
 	/**
-	 * Zapisuje znak podany w parametrze do grupy lub aktualny znak ze strumienia.
+	 * Zapisuje dane podane w parametrze do grupy, aktualny znak ze strumienia lub dane ze schowka.
 	 * 
 	 * DESCRIPTION:
-	 *     W zależności od argumentu zapisuje podany znak lub znak ze strumienia.
 	 *     W przypadku gdy zapisywany jest znak ze strumienia, pozycja kursora jest zwiększana.
+	 *     Zapis danych ze schowka do aktualnej grupy jest nieco bardziej skomplikowany.
+	 *     W miejsce danych do zapisu należy podać indeks danych ze schowka.
+	 *     Gdy indeks zostanie odnaleziony, funkcja rozpocznie wyszukiwanie danych po pozycji startowej.
+	 *     Można również w ostatnim argumencie podać indeks elementu w grupie.
+	 *     Dzięki temu element nie będzie wyszukiwany po pozycji ale będzie pobierany od razu względem
+	 *     podanej w parametrze pozycji.
 	 *
 	 * CODE:
-	 *     $this->Write( ['', 'w'] );
-	 *     $this->Write( ['', false] );
+	 *     $this->Write( ['', 'write_test', false] );
+	 *     $this->Write( ['', false, false] );
+	 *     $this->Write( ['', 'DOUBLE_QUOTE', -1] );
+	 *     $this->Write( ['', 'DOUBLE_QUOTE', 5] );
 	 *
 	 * PARAMETERS:
 	 *     $rule Tablica z argumentami dla reguły.
 	 *           - 0 > Indeks zarezerwowany.
-	 *           - 1 > Znak zapisywany do grupy lub FALSE w przypadku zapisu ze strumienia.
+	 *           - 1 > Dane do zapisu, index lub FALSE w przypadku zapisu ze strumienia.
+	 *           - 2 > Czy dane mają być zapisane ze schowka?
+	 *           - 3 > Indeks elementu ze schowka lub -1 dla automatycznego wyszukiwania.
 	 *
 	 * RETURNS:
 	 *     Zawsze wartość TRUE.
 	 */
 	protected function Write( array &$rule ): bool
 	{
+		// zapis ze schowka
+		if( $rule[2] !== false )
+		{
+			// zapis z podanego indeksu
+			if( $rule[2] != -1 )
+				$this->gcontent[$this->gpos] .= $this->groups[0]->elements[$rule[1]][$rule[2]];
+			// wyszukiwanie indeksu
+			else
+				foreach( $this->groups[0]->elements[$rule[1]] as $elem )
+					if( $this->pos == $elem->start )
+					{
+						$this->gcontent[$this->gpos] .= $elem->content;
+						break;
+					}
+
+			return true;
+		}
+
+		// zapis podanych danych lub zapis ze strumienia
 		$this->gcontent[$this->gpos] .= $rule[1]
 			? $rule[1]
 			: $this->data[$this->pos++];
@@ -1233,8 +1008,8 @@ class Berseker
 		if( $this->length <= $this->pos )
 			return false;
 
-		// Logger::Log('  - [' . $this->ReadableCharArray($rule[1]) . '] is: "' .
-			// $this->ReadableChar($this->data[$this->pos]) . '"' );
+		Logger::Log('  - [' . $this->ReadableCharArray($rule[1]) . '] is: "' .
+			$this->ReadableChar($this->data[$this->pos]) . '"' );
 
 		// jeżeli znak istnieje w tablicy
 		if( isset($rule[1][$this->data[$this->pos]]) )
@@ -1287,8 +1062,8 @@ class Berseker
 	 */
 	protected function Next( &$rule ): bool
 	{
-		// Logger::Log('  - expecting: "' . $this->ReadableChar($rule[1]) . '" is: "' .
-			// $this->ReadableChar($this->data[$this->pos]) . '"' );
+		Logger::Log('  - expecting: "' . $this->ReadableChar($rule[1]) . '" is: "' .
+			$this->ReadableChar($this->data[$this->pos]) . '"' );
 
 		if( $rule[1] == $this->data[$this->pos] )
 		{
@@ -1320,20 +1095,20 @@ class Berseker
 	 */
 	public function Run( string $rule = 'ENTRY' ): void
 	{
-		// Logger::Log( "> {$rule}" );
+		Logger::Log( "> {$rule}" );
 
 		if( $this->length <= $this->pos )
 			return;
-		// Logger::IndentInc();
+		Logger::IndentInc();
 
 		foreach( $this->rules[$rule] as $val )
 		{
-			// Logger::Log( "+ {$val[0]}" );
+			Logger::Log( "+ {$val[0]}" );
 			if( !$this->{$val[0]}($val) )
 				break;
 		}
 
-		// Logger::IndentDec();
+		Logger::IndentDec();
 	}
 
 	protected function String( &$rule ): bool
@@ -1369,7 +1144,7 @@ class Berseker
 		}
 
 		$this->pos += strlen( $matches[0] );
-		$this->results[] = $matches[0];
+		$this->gcontent[$this->gpos] .= $matches[0];
 
 		return true;
 	}
@@ -1418,18 +1193,13 @@ class Berseker
 	 */
 	public function GetLineFromPosition( int $pos ): int
 	{
-		if( $pos < $this->lfcpos )
-		{
-			for( ; $this->lfpos > 0; --$this->lfpos )
-				if( $pos > $this->linefeeds[$this->lfpos] )
-					return $this->lfpos;
-		}
-		else
-		{
-			for( $y = count($this->linefeeds); $this->lfpos < $y; ++$this->lfpos )
-				if( $pos <= $this->linefeeds[$this->lfpos] )
-					return $this->lfpos;
-		}
+		if( $pos < $this->lfpos )
+			$this->lfpos = 0;
+
+		for( $y = count($this->linefeeds); $this->lfpos < $y; ++$this->lfpos )
+			if( $pos <= $this->linefeeds[$this->lfpos] )
+				return $this->lfpos;
+
 		return 0;
 	}
 
@@ -1449,7 +1219,7 @@ class Berseker
 				{
 					if( !isset($this->mappings[$value[0]]) )
 					{
-						// Logger::Log( "ERROR: Function ${$value[0]} not exist!" );
+						Logger::Log( "ERROR: Function ${$value[0]} not exist!" );
 						continue;
 					}
 
@@ -1514,20 +1284,26 @@ class Berseker
 	}
 }
 
+$grc = new Berseker( 'gramma/c.json' );
+$grc->GetRulesFromFile( 'gramma/json_strip_comments.json' );
+$grc->UnificateLineEndings();
+$grc->Run( 'ENTRY' );
 
-$berseker = new Berseker( './test/moss/tst/array_test.c' );
+// var_dump( $grc->data );
+
+// $berseker = new Berseker( './test/moss/tst/array_test.c' );
 // $berseker = new Berseker( './test/main.c' );
 
-$berseker->GetRulesFromFile( 'gramma/c.json' );
-$berseker->UnificateLineEndings();
-$berseker->Run( 'ENTRY' );
+// $berseker->GetRulesFromFile( 'gramma/c.json' );
+// $berseker->UnificateLineEndings();
+// $berseker->Run( 'ENTRY' );
 
 // echo $berseker->data;
 // var_dump( $berseker->results );
-file_put_contents('asdf.txt', $berseker->data);
+// file_put_contents('asdf.txt', $berseker->data);
 
-file_put_contents('asdfg.txt', print_r($berseker->results, true));
-file_put_contents('asdfgh.txt', print_r($berseker->storage, true));
+// file_put_contents('asdfg.txt', print_r($berseker->results, true));
+// file_put_contents('asdfgh.txt', print_r($berseker->storage, true));
 
 // $parser->ExtractScope( $content );
 // $parser->ParseElements();

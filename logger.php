@@ -17,7 +17,7 @@ abstract class Logger
 
 	public static function Log( $message )
 	{
-		echo '# ' . Logger::$indent . $message . "\n";
+		// echo '# ' . Logger::$indent . $message . "\n";
 	}
 
 	public static function Info( $message )

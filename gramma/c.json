@@ -26,26 +26,40 @@
 			"replace": "ms_{:_x}_get_{:_y}"
 		}
 	},
-	"VARIABLES": null,
+
+	"VARIABLES": {
+	},
+
 	"START": "ENTRY",
+
 	"STEPS": {
+
+		/* ================================================================== *
+		 * PUNKT WEJŚCIOWY                                                    *
+		 * ================================================================== */
 		"ENTRY": [
-			["LOOP",
-				"PREPARE_TEXT"
-			],
-			["REWIND",
-				0
-			]
+			// usuń zbędny tekst i komentarze
+			[ "LOOP", "PREPARE_TEXT" ],
+			// przewiń na początek
+			[ "REWIND", 0 ],
+			// przechwytuj symbole
+			[ "LOOP", "CAPTURE_DATA" ]
 		],
+
+		/* ================================================================== *
+		 * WYSZUKIWANIE KOMENTARZY I STAŁYCH TEKSTOWYCH                       *
+		 * ================================================================== */
 		"PREPARE_TEXT": [
-			["SEEK_UNTIL_ONE_OF", {
+			[
+				"SEEK_UNTIL_ONE_OF", {
 					"/":  false,
 					"\"": false,
 					"'":  false
 				},
 				false
 			],
-			["CHAR_CHECK", {
+			[
+				"CHAR_CHECK", {
 					"/":  "COMMENT",
 					"\"": "SKIP_CONTENT_DOUBLE",
 					"'":  "SKIP_CONTENT_SINGLE"
@@ -53,164 +67,319 @@
 				false
 			]
 		],
+
+		/* ================================================================== *
+		 * USUWANIE Z TEKSTU STAŁYCH TEKSTOWYCH (CONSTANT STRING)             *
+		 * ================================================================== */
 		"SKIP_CONTENT_DOUBLE": [
-			["STORAGE", "DOUBLE_QUOTE"],
-			["REPLACE_UNTIL_ESCAPE",
-				"\"",
-				" ",
-				"\\",
-				true
-			],
-			["STORAGE", false]
+			[ "STORAGE", "DOUBLE_QUOTE" ],
+			[ "REPLACE_UNTIL_ESCAPE", "\"", " ", "\\", true ],
+			[ "STORAGE", false ]
 		],
+
+		/* ================================================================== *
+		 * USUWANIE Z TEKSTU STAŁYCH ZNAKÓW (CONSTANT CHAR)                   *
+		 * ================================================================== */
 		"SKIP_CONTENT_SINGLE": [
-			["STORAGE", "SINGLE_QUOTE"],
-			["REPLACE_UNTIL_ESCAPE",
-				"'",
-				" ",
-				"\\",
-				true
-			],
-			["STORAGE", false]
+			[ "STORAGE", "SINGLE_QUOTE" ],
+			[ "REPLACE_UNTIL_ESCAPE", "'", " ", "\\", true ],
+			[ "STORAGE", false ]
 		],
+
+		/* ================================================================== *
+		 * ROZPOZNAWANIE TYPU KOMENTARZA                                      *
+		 * ================================================================== */
 		"COMMENT": [
-			["CHAR", {
+			[
+				"CHAR", {
 					"/": "COMMENT_LINE_START",
 					"*": "COMMENT_BLOCK_START"
 				},
 				false
 			]
 		],
+
+		/* ================================================================== *
+		 * ROZPOCZYNANIE KOMENTARZA BLOKOWEGO                                 *
+		 * ================================================================== */
 		"COMMENT_BLOCK_START": [
-			["GROUP",
-				"COMMENT_BLOCK"
-			],
-			["SEEK",
-				-2
-			],
-			["REPLACE_MANY",
-				2,
-				" ",
-				false
-			],
-			["EXECUTE",
-				"COMMENT_BLOCK"
-			],
-			["GROUP",
-				false
-			]
+			[ "GROUP", "COMMENT_BLOCK" ],
+			// cofnij się o dwa znaki wstecz do punktu rozpoczęcia komentarza
+			[ "SEEK", -2 ],
+			// zamień znaki /* na spacje
+			[ "REPLACE_MANY", 2, " ", false ],
+			// odpal główną część usuwania komentarza
+			[ "EXECUTE",	"COMMENT_BLOCK" ],
+			[ "GROUP", false ]
 		],
+
+		/* ================================================================== *
+		 * TREŚĆ KOMENTARZA BLOKOWEGO                                         *
+		 * ================================================================== */
 		"COMMENT_BLOCK": [
-			["REPLACE_UNTIL_ONE_OF", {
+			[
+				"REPLACE_UNTIL_ONE_OF", {
 					"\n": false,
 					"*" : false
 				},
 				" ",
 				true
 			],
-			["NEXT",
-				"*",
-				"COMMENT_BLOCK_END_PREPARE",
-				false
-			],
-			["SEEK_GET",
-				1
-			],
-			["EXECUTE",
-				"COMMENT_BLOCK"
-			]
+			[ "NEXT", "*", "COMMENT_BLOCK_END_PREPARE", false ],
+			[ "SEEK_GET", 1 ],
+			[ "EXECUTE", "COMMENT_BLOCK" ]
 		],
+
+		/* ================================================================== *
+		 * PRZYGOTOWANIA DO ZAKOŃCZENIA KOMENTARZA BLOKOWEGO                  *
+		 * ================================================================== */
 		"COMMENT_BLOCK_END_PREPARE": [
-			["NEXT",
-				"/",
-				"COMMENT_BLOCK_END",
-				false
-			],
-			["SEEK",
-				-1
-			],
-			["REPLACE",
-				" ",
-				true
-			],
-			["EXECUTE",
-				"COMMENT_BLOCK"
-			]
+			// sprawdź czy po znaku * występuje znak /
+			[ "NEXT", "/", "COMMENT_BLOCK_END", false ],
+			// jeżeli nie, cofnij
+			[ "SEEK", -1 ],
+			// zamień na spację
+			[ "REPLACE", " ", true ],
+			// i wróć do głównego punktu pobierania danych komentarza
+			[ "EXECUTE", "COMMENT_BLOCK" ]
 		],
+
+		/* ================================================================== *
+		 * ZAKOŃCZENIE KOMENTARZA BLOKOWEGO                                   *
+		 * ================================================================== */
 		"COMMENT_BLOCK_END": [
-			["SEEK",
-				-2
-			],
-			["REPLACE_MANY",
-				2,
-				" ",
-				false
-			]
+			[ "SEEK", -2 ],
+			[ "REPLACE_MANY", 2, " ", false ]
 		],
+
+		/* ================================================================== *
+		 * ROZPOCZĘCIE KOMENTARZA LINIOWEGO                                   *
+		 * ================================================================== */
 		"COMMENT_LINE_START": [
-			["GROUP",
-				"COMMENT_LINE"
-			],
-			["SEEK",
-				-1
-			],
-			["REPLACE",
-				" ",
-				false
-			],
-			["EXECUTE",
-				"COMMENT_LINE"
-			],
-			["GROUP",
-				false
-			]
+			[ "GROUP", "COMMENT_LINE" ],
+			// przewiń o 1 do tyłu
+			// zamieni tylko jedno /, ale to drugie zamieni punkt pobierający
+			// treść komentarza liniowego
+			[ "SEEK", -1 ],
+			[ "REPLACE", " ", false ],
+			[ "EXECUTE", "COMMENT_LINE" ],
+			[ "GROUP", false ]
 		],
+
+		/* ================================================================== *
+		 * KONTYNUOWANIE KOMENTARZA LINIOWEGO                                 *
+		 * ================================================================== */
 		"COMMENT_LINE_CONTINUE": [
-			["SEEK",
-				-1
-			],
-			["WRITE_FROM_STREAM"],
-			["EXECUTE",
-				"COMMENT_LINE"
-			]
+			// cofnij o jeden do tyłu
+			[ "SEEK", -1 ],
+			// zapisz znak nie zamieniając go (to jest znak nowej linii)
+			[ "WRITE_FROM_STREAM" ],
+			// przejdź do głównego punktu pobierania komentarza liniowego
+			[ "EXECUTE", "COMMENT_LINE" ]
 		],
+
+		/* ================================================================== *
+		 * POBIERANIE KOMENTARZA LINIOWEGO                                    *
+		 * ================================================================== */
 		"COMMENT_LINE": [
-			["SEEK",
-				-2
-			],
-			["REPLACE",
-				" ",
-				false
-			],
-			["SEEK",
-				1
-			],
-			["REPLACE_UNTIL_ONE_OF", {
+			// przewiń o dwa do tyłu
+			// w przypadku gdy komentarz liniowy jest jednak wieloliniowy
+			// czyli znak nowej linii został poprzedzony znakiem \
+			// to znak \ należy zamienić na spację, znak nowej linii zaś
+			// pozostawić
+			[ "SEEK", -2 ],
+			// zamień znak / lub \ na spację
+			// tyczy się to dwóch sytuacji, jedna wymieniona została powyżej
+			// druga to rozpoczęcie komentarza, opisane w COMMENT_LINE_START
+			[ "REPLACE", " ", false ],
+			// przewiń o jeden do przodu, zostawiając znak w spokoju
+			[ "SEEK", 1 ],
+			// zamieniaj do napotkania znaku \ lub \n
+			[
+				"REPLACE_UNTIL_ONE_OF", {
 					"\\": false,
 					"\n" : false
 		 		},
 				" ",
 				true
 			],
+			// w przypadku znaku \ leć dalej
+			["NEXT", "\\", false, " "],
+			// zamień na spację
+			["REPLACE", " ", false],
+			// i sprawdź czy kolejnym znakiem jest znak nowej linii
+			["NEXT", "\n", "COMMENT_LINE_CONTINUE", false],
+			// jeżeli nie, zapisz znak \ w schowku
+			["WRITE",   "\\"],
+			// i powtórz punkt
+			["EXECUTE", "COMMENT_LINE"]
+		],
+		"CAPTURE_DATA": [
+			["WHITECHAR"],
+			["NEXT_CHECK",
+				"#",
+				"MACRO",
+				"SYMBOL"
+			]
+		],
+		"MACRO": [
+			["WHITESPACE"],
+			["STRING",
+				"/[a-z]+/A",
+				{
+					"include": "MACRO_INCLUDE",
+					"define" : "MACRO_DEFINE"
+				},
+				"SKIP_LINE"
+			]
+		],
+		"MACRO_INCLUDE": [
+			["GROUP", "INCLUDE"],
+			["WHITESPACE"],
+			["CHAR_CHECK", {
+					"<" : "MACRO_INCLUDE_CHEVRON",
+					"\"": "MACRO_INCLUDE_QUOTE"
+				},
+				"SKIP_LINE"
+			],
+			["GROUP", false]
+		],
+		"MACRO_INCLUDE_CHEVRON": [
+			["WRITE",   "<"],
+			["CAPTURE", "/[^\">\r\n]+/A", false],
+			["EXECUTE", "SKIP_LINE"],
+			["WRITE",   ">"]
+		],
+		"MACRO_INCLUDE_QUOTE": [
+			["WRITE",              "\""],
+			["WRITE_AUTO_STORAGE", "DOUBLE_QUOTE"],
+			["EXECUTE",            "SKIP_LINE"],
+			["WRITE",              "\""]
+		],
+		"MACRO_DEFINE": [
+			["GROUP", "MACRO"],
+			["WHITESPACE"],
+			["CAPTURE",
+				"/[a-zA-Z_$][a-zA-Z0-9_$]*/A",
+				false
+			],
+			["NEXT_CHECK",
+				"(",
+				"MACRO_DEFINE_PARAM",
+				"SKIP_LINE"
+			],
+			["GROUP", false]
+		],
+		"MACRO_DEFINE_PARAM": [
+			["GROUP", "PARAMETERS"],
+			["WHITESPACE"],
+			["CAPTURE",
+				"/[\\.a-zA-Z_$][\\.a-zA-Z0-9_$]*/A",
+				false
+			],
+			["WHITESPACE"],
+			["GROUP", false],
+			["NEXT",
+				",",
+				"MACRO_DEFINE_PARAM",
+				"SKIP_LINE"
+			]
+		],
+		"SYMBOL": [
+			["GROUP", "SYMBOL"],
+			["WHITECHAR"],
+			["LOOP", "SYMBOL_RECOGNIZE"],
+			["GROUP", false]
+		],
+		"SYMBOL_RECOGNIZE": [
+			["GROUP", "MODIFIERS"],
+			["GROUP", "POINTER"],
+			["CAPTURE", "/[\\*\\s]*/A", false],
+			["GROUP", false],
+			["WHITECHAR"],
+			["CAPTURE",
+				"/[a-zA-Z_$][a-zA-Z0-9_$]*/A",
+				false
+			],
+			["GROUP", "ARRAY"],
+			["WHITECHAR"],
+			["CAPTURE", "/\\[[\\s]*[0-9]*[\\s]*\\]*/A", false],
+			["GROUP", false],
+			["GROUP", false],
+			["WHITECHAR"],
+			["CHAR", {
+					"(": "SYMBOL_PARAMETERS",
+					")": " ",
+					";": false,
+					",": " ",
+					"=": "SYMBOL_SKIP_VALUE",
+					"{": "SYMBOL_SKIP_DEFINITION",
+					"}": " "
+				},
+				false
+			]
+		],
+		"SYMBOL_PARAMETERS": [
+			["GROUP", "PARAMETERS"],
+			["WHITECHAR"],
+			["LOOP", "SYMBOL_RECOGNIZE"],
+			["GROUP", false],
+			["CHAR", {
+					",": "SYMBOL_PARAMETERS",
+					")": false
+				},
+				" "
+			],
+			["SEEK", 1],
+			["WHITECHAR"],
+			["NEXT", "{", false, " "],
+			["SEEK", 1],
+			["SEEK_BLOCK", "{", "}"]
+		],
+		"SYMBOL_SKIP_DEFINITION": [
+			["SEEK_BLOCK", "{", "}"],
+			["SEEK_UNTIL", ";", false],
+			["SEEK", 1]
+		],
+		"SYMBOL_SKIP_VALUE": [
+			["SEEK_UNTIL_ONE_OF", {
+					";": false,
+					",": false,
+					"{": false
+				},
+				false
+			],
+			["NEXT",
+				"{",
+				false,
+				" "
+			],
+			["SEEK", 1],
+			["SEEK_BLOCK", "{", "}"],
+			["WHITECHAR"],
+			["NEXT",
+				";",
+				false,
+				"SYMBOL_RECOGNIZE"
+			],
+			["SEEK", 1]
+		],
+		"SKIP_LINE": [
+			["SEEK_UNTIL_ONE_OF", {
+					"\\": false,
+					"\n": false
+				},
+				false
+			],
 			["NEXT",
 				"\\",
 				false,
 				" "
 			],
-			["REPLACE",
-				" ",
-				false
-			],
-			["NEXT",
+			["NEXT_CHECK",
 				"\n",
-				"COMMENT_LINE_CONTINUE",
+				"SKIP_LINE",
 				false
-			],
-			["WRITE",
-				"\\"
-			],
-			["EXECUTE",
-				"COMMENT_LINE"
 			]
 		]
 	}

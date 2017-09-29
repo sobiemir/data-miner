@@ -1,0 +1,98 @@
+{
+	"REWIND": [
+		[             ], "Rewind",            1, [-1            ]
+	],
+	"LOOP":
+		[[            ], "Loop",              1, [-1            ]
+	],
+	"EXECUTE":
+		[[            ], "Execute",           1, [-1            ]
+	],
+	"SEEK":
+		[[false       ], "Seek",              2, [-1,  0        ]
+	],
+	"SEEK_GET":
+		[[true        ], "Seek",              2, [-1,  0        ]
+	],
+	"SEEK_UNTIL":
+		[[false       ], "SeekUntil",         3, [-1, -1,  0    ]
+	],
+	"SEEK_UNTIL_ESCAPE":
+		[[            ], "SeekUntil",         3, [-1, -1, -1    ]
+	],
+	"SEEK_UNTIL_ONE_OF":
+		[[            ], "SeekUntilOneOf",    2, [-1, -1        ]
+	],
+	"SEEK_BLOCK":
+		[[false       ], "SeekBlock",         3, [-1, -1,  0    ]
+	],
+	"SEEK_BLOCK_GET":
+		[[true        ], "SeekBlock",         3, [-1, -1,  0    ]
+	],
+	"CHAR_CHECK":
+		[[true        ], "Char",              3, [-1, -1,  0    ]
+	],
+	"CHAR":
+		[[false       ], "Char",              3, [-1, -1,  0    ]
+	],
+	"STRING":
+		[[false       ], "String",            4, [-1, -1, -1,  0]
+	],
+	"STRING_CHECK":
+		[[true        ], "String",            4, [-1, -1, -1,  0]
+	],
+	"GROUP":
+		[[            ], "Group",             1, [-1            ]
+	],
+	"STORAGE":
+		[[            ], "Storage",           1, [-1            ]
+	],
+	"CAPTURE":
+		[[            ], "Capture",           2, [-1, -1        ]
+	],
+	"REPLACE":
+		[[1           ], "Replace",           3, [ 0, -1, -1    ]
+	],
+	"REPLACE_MANY":
+		[[            ], "Replace",           3, [-1, -1, -1    ]
+	],
+	"REPLACE_UNTIL":
+		[[true        ], "ReplaceUntil",      4, [-1, -1,  0, -1]
+	],
+	"REPLACE_UNTIL_ESCAPE":
+		[[            ], "ReplaceUntil",      4, [-1, -1, -1, -1]
+	],
+	"RUN_PREPROCESSOR":
+		[[            ], "RunPreprocessor",   0, [              ]
+	], 
+	"REPLACE_UNTIL_ONE_OF":
+		[[            ], "ReplaceUntilOneOf", 3, [-1, -1, -1    ]
+	],
+	"NEXT":
+		[[false       ], "Next",              4, [-1, -1, -1,  0]
+	],
+	"NEXT_CHECK":
+		[[true        ], "Next",              4, [-1, -1, -1,  0]
+	],
+	"WRITE":
+		[[false       ], "Write",             2, [-1,  0        ]
+	],
+	"WRITE_FROM_STREAM":
+		[[false, false], "Write",             2, [ 0,  1        ]
+	],
+	"WRITE_FROM_STORAGE":
+		[[            ], "Write",             2, [-1, -1        ]
+	],
+	"WRITE_AUTO_STORAGE":
+		[[-1          ], "Write",             2, [-1,  0        ]
+	],
+	"WHITECHAR":
+		[[false, false], "WhiteChar",         2, [ 0,  1        ]
+	],
+	"WHITECHAR_ESCAPE":
+		[[false, true ], "WhiteChar",         2, [ 0,  1        ]
+	],
+	"WHITESPACE":
+		[[true,  true ], "WhiteChar",         2, [ 0,  1        ]
+	]
+}

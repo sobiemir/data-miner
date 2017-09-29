@@ -1,0 +1,91 @@
+{
+	"PREDEFINED": {},
+
+	"VARIABLES": {},
+
+	"START": "ENTRY",
+
+	"STEPS": {
+
+		"ENTRY": [
+			[ "LOOP", "STRIP_COMMENTS" ]
+		],
+
+		"STRIP_COMMENTS": [
+			[
+				"SEEK_UNTIL_ONE_OF", {
+					"/":  false,
+					"\"": false
+				},
+				false
+			],
+			[
+				"CHAR_CHECK", {
+					"/":  "COMMENT",
+					"\"": "SKIP_CONTENT_DOUBLE"
+				},
+				false
+			]
+		],
+
+		"SKIP_CONTENT_DOUBLE": [
+			[ "SEEK_UNTIL_ESCAPE", "\"", "\\", false ]
+		],
+
+		"COMMENT": [
+			[
+				"CHAR", {
+					"/": "COMMENT_LINE_START",
+					"*": "COMMENT_BLOCK_START"
+				},
+				false
+			]
+		],
+
+		"COMMENT_BLOCK_START": [
+			[ "SEEK", -2 ],
+			[ "REPLACE_MANY", 2, " ", false ],
+			[ "EXECUTE", "COMMENT_BLOCK" ]
+		],
+
+		"COMMENT_BLOCK": [
+			[
+				"REPLACE_UNTIL_ONE_OF", {
+					"\n": false,
+					"*" : false
+				},
+				" ",
+				false
+			],
+			[ "NEXT", "*", "COMMENT_BLOCK_END_PREPARE", false ],
+			[ "SEEK", 1 ],
+			[ "EXECUTE", "COMMENT_BLOCK" ]
+		],
+
+		"COMMENT_BLOCK_END_PREPARE": [
+			[ "NEXT", "/", "COMMENT_BLOCK_END", false ],
+			[ "SEEK", -1 ],
+			[ "REPLACE", " ", false ],
+			[ "EXECUTE", "COMMENT_BLOCK" ]
+		],
+
+		"COMMENT_BLOCK_END": [
+			[ "SEEK", -2 ],
+			[ "REPLACE_MANY", 2, " ", false ]
+		],
+
+		"COMMENT_LINE_START": [
+			[ "SEEK", -1 ],
+			[ "REPLACE", " ", false ],
+			[ "EXECUTE", "COMMENT_LINE" ]
+		],
+
+		"COMMENT_LINE": [
+			[ "SEEK", -2 ],
+			[ "REPLACE", " ", false ],
+			[ "SEEK", 1 ],
+			[ "REPLACE_UNTIL", "\n", " ", false ],
+			[ "REPLACE", " ", false ]
+		]
+	}
+}

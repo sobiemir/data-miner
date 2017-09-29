@@ -32,7 +32,7 @@
 #include <mstest.h>
 
 #include "testInclude.h"
-#include "someanothertest.h"
+#include "someAnotherTest.h"
 
 /**
  * Struktura zawierająca dane używane w funkcjach testujących.
@@ -1080,6 +1080,11 @@ int mst_array_base_copy_return( MST_FUNCTION *info )
 ======================================================================================================================
 */
 
+#define TESTFUNCTION_OF_MACRO_WITH_PARAM(x,y,z) (func ## x)(y, z)
+#define TESTFUNCTION_OF_MACRO() func
+#define TESTFUNCTION_OF_MACRO_VARARG(x, ...) somefunc(x, __VA_ARGS__)
+#define TESTFUNCTION_OF_MACRO_VARFIRST(...) somefunc(__VA_ARGS__)
+
 /**
  * Opisy funkcji testujących.
  * Wyświetlane są zaraz pod nazwą funkcji podczas testowania.
@@ -1179,6 +1184,6 @@ MST_SUITE MSV_ArraySuite =
 
 // Komentarz wielolioniowy \a\
 	Asadsad asdjas diosaj dio
-	int xacv() {
+	int xacv(int w, int c, int *ac, char **b) {
 		return 4; // zwróć coś
 	}
