@@ -376,6 +376,7 @@
 				false,
 				" "
 			],
+			["SEEK", 1],
 			["NEXT_CHECK",
 				"\n",
 				"SKIP_LINE",
