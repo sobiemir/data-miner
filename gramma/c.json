@@ -57,8 +57,7 @@
 					"'":  false
 				},
 				false
-			],
-			[
+			], [
 				"CHAR_CHECK", {
 					"/":  "COMMENT",
 					"\"": "SKIP_CONTENT_DOUBLE",
@@ -103,6 +102,7 @@
 		 * ROZPOCZYNANIE KOMENTARZA BLOKOWEGO                                 *
 		 * ================================================================== */
 		"COMMENT_BLOCK_START": [
+			// przypisanie go do grupy powoduje zapis w pamięci jego treści
 			[ "GROUP", "COMMENT_BLOCK" ],
 			// cofnij się o dwa znaki wstecz do punktu rozpoczęcia komentarza
 			[ "SEEK", -2 ],
@@ -110,6 +110,7 @@
 			[ "REPLACE_MANY", 2, " ", false ],
 			// odpal główną część usuwania komentarza
 			[ "EXECUTE",	"COMMENT_BLOCK" ],
+			// wyłączenie grupy
 			[ "GROUP", false ]
 		],
 
@@ -214,16 +215,27 @@
 			// i powtórz punkt
 			["EXECUTE", "COMMENT_LINE"]
 		],
+
+		/* ================================================================== *
+		 * PRZECHWYTYWANIE SYMBOLI Z TEKSTU                                   *
+		 * ================================================================== */
 		"CAPTURE_DATA": [
+			// pomiń wszystkie białe znaki
 			["WHITECHAR"],
+			// sprawdź czy mamy do czynienia z makrem czy z symbolem
 			["NEXT_CHECK",
 				"#",
 				"MACRO",
 				"SYMBOL"
 			]
 		],
+
+		/* ================================================================== *
+		 * WYKRYWANIE MAKRA W TEKŚCIE                                         *
+		 * ================================================================== */
 		"MACRO": [
 			["WHITESPACE"],
+			// sprawdź z czym mamy do czynienia
 			["STRING",
 				"/[a-z]+/A",
 				{
@@ -233,7 +245,12 @@
 				"SKIP_LINE"
 			]
 		],
+
+		/* ================================================================== *
+		 * MAKRO DOŁĄCZANIA PLIKU DO KOMPILACJI                               *
+		 * ================================================================== */
 		"MACRO_INCLUDE": [
+			// przechwytuj pobrane dane do grupy INCLUDE
 			["GROUP", "INCLUDE"],
 			["WHITESPACE"],
 			["CHAR_CHECK", {
@@ -244,18 +261,30 @@
 			],
 			["GROUP", false]
 		],
+
+		/* ================================================================== *
+		 * DOŁĄCZANIE PLIKU BIBLIOTEKI                                        *
+		 * ================================================================== */
 		"MACRO_INCLUDE_CHEVRON": [
 			["WRITE",   "<"],
 			["CAPTURE", "/[^\">\r\n]+/A", false],
 			["EXECUTE", "SKIP_LINE"],
 			["WRITE",   ">"]
 		],
+
+		/* ================================================================== *
+		 * DOŁĄCZANIE PLIKU LOKALNEGO                                         *
+		 * ================================================================== */
 		"MACRO_INCLUDE_QUOTE": [
 			["WRITE",              "\""],
 			["WRITE_AUTO_STORAGE", "DOUBLE_QUOTE"],
 			["EXECUTE",            "SKIP_LINE"],
 			["WRITE",              "\""]
 		],
+
+		/* ================================================================== *
+		 * DEFINIOWANIE MAKRA                                                 *
+		 * ================================================================== */
 		"MACRO_DEFINE": [
 			["GROUP", "MACRO"],
 			["WHITESPACE"],
@@ -270,6 +299,10 @@
 			],
 			["GROUP", false]
 		],
+
+		/* ================================================================== *
+		 * POBIERANIE WARTOŚCI MAKRA                                          *
+		 * ================================================================== */
 		"MACRO_DEFINE_PARAM": [
 			["GROUP", "PARAMETERS"],
 			["WHITESPACE"],
@@ -285,12 +318,20 @@
 				"SKIP_LINE"
 			]
 		],
+
+		/* ================================================================== *
+		 * WYSZUKIWANIE SYMBOLU                                               *
+		 * ================================================================== */
 		"SYMBOL": [
 			["GROUP", "SYMBOL"],
 			["WHITECHAR"],
 			["LOOP", "SYMBOL_RECOGNIZE"],
 			["GROUP", false]
 		],
+
+		/* ================================================================== *
+		 * ROZPOZNAWANIE TYPU SYMBOLU                                         *
+		 * ================================================================== */
 		"SYMBOL_RECOGNIZE": [
 			["GROUP", "MODIFIERS"],
 			["GROUP", "POINTER"],
@@ -310,7 +351,7 @@
 			["CHAR", {
 					"(": "SYMBOL_PARAMETERS",
 					")": " ",
-					";": false,
+					";": "SKIP_ONE",
 					",": " ",
 					"=": "SYMBOL_SKIP_VALUE",
 					"{": "SYMBOL_SKIP_DEFINITION",
@@ -319,6 +360,17 @@
 				false
 			]
 		],
+
+		/* ================================================================== *
+		 * POMIJA JEDEN ZNAK                                                  *
+		 * ================================================================== */
+		"SKIP_ONE": [
+			["SEEK", 1]
+		],
+
+		/* ================================================================== *
+		 * PARAMETRY SYMBOLU                                                  *
+		 * ================================================================== */
 		"SYMBOL_PARAMETERS": [
 			["GROUP", "PARAMETERS"],
 			["WHITECHAR"],
@@ -336,11 +388,19 @@
 			["SEEK", 1],
 			["SEEK_BLOCK", "{", "}"]
 		],
+
+		/* ================================================================== *
+		 * POMIJANIE DEFINICJI SYMBOLU (CIAŁA FUNKCJI / STRUKTURY)            *
+		 * ================================================================== */
 		"SYMBOL_SKIP_DEFINITION": [
 			["SEEK_BLOCK", "{", "}"],
 			["SEEK_UNTIL", ";", false],
 			["SEEK", 1]
 		],
+
+		/* ================================================================== *
+		 * POMIJANIE WARTOŚCI SYMBOLU                                         *
+		 * ================================================================== */
 		"SYMBOL_SKIP_VALUE": [
 			["SEEK_UNTIL_ONE_OF", {
 					";": false,
@@ -364,6 +424,10 @@
 			],
 			["SEEK", 1]
 		],
+
+		/* ================================================================== *
+		 * POMIJANIE LINII                                                    *
+		 * ================================================================== */
 		"SKIP_LINE": [
 			["SEEK_UNTIL_ONE_OF", {
 					"\\": false,
