@@ -180,13 +180,18 @@ class Parser
 	 */
 	protected function Seek( array &$rule ): bool
 	{
-		Logger::Log(
-			"  - [{$rule[1]} : \"" .
-				$this->ReadableChar($this->data[$this->pos + $rule[1]]) .
-				"\"] from [{$this->pos} : \"" .
-				$this->ReadableChar($this->data[$this->pos]) .
-			"\"]"
-		);
+		if( isset($this->data[$this->pos + $rule[1]]) )
+			Logger::Log(
+				"  - [{$rule[1]} : \"" .
+					$this->ReadableChar($this->data[$this->pos + $rule[1]]) .
+					"\"] from [{$this->pos} : \"" .
+					$this->ReadableChar($this->data[$this->pos]) .
+				"\"]"
+			);
+		else
+			Logger::Log(
+				"  - [{$rule[1]}] : end of file"
+			);
 
 		// zapis danych do grupy
 		if( $rule[2] )
@@ -856,7 +861,8 @@ class Parser
 			$group->group->endLine = $this->GetLineFromPosition( $this->pos );
 			$group->group->content = $this->gcontent[$this->gpos];
 
-			if( $this->gcontent[$this->gpos] == '' && count($group->group->subGroups) == 0 )
+			if( $this->gcontent[$this->gpos] == '' && count($group->group->subGroups) == 0 &&
+				isset($this->groups[$this->gpos - 1]->group->subGroups[$group->name]) )
 				array_pop( $this->groups[$this->gpos - 1]->group->subGroups[$group->name] );
 
 			$this->gpos--;
@@ -1086,16 +1092,25 @@ class Parser
 
 	protected function String( &$rule ): bool
 	{
+		if( $this->length <= $this->pos )
+			return false;
+
 		if( !preg_match($rule[1], $this->data, $matches, 0, $this->pos) )
 			return true;
 
-		$this->pos += strlen( $matches[0] );
+		Logger::Log('  - [' . $this->ReadableStringArray($rule[2]) . '] is: "' .
+			$matches[0] . '"' );
 
 		if( isset($rule[2][$matches[0]]) )
 		{
-			if( $rule[2][$matches[0]] != ' ' )
-				$this->Run( $rule[2][$matches[0]] );
-			return $rule[4];
+			if( $rule[2][$matches[0]] )
+			{
+				if( $rule[2][$matches[0]] != ' ' )
+					$this->Run( $rule[2][$matches[0]] );
+				return $rule[4];
+			}
+			else
+				$this->pos += strlen( $matches[0] );
 		}
 		else if( $rule[3] )
 		{
@@ -1103,8 +1118,27 @@ class Parser
 				$this->Run( $rule[3] );
 			return $rule[4];
 		}
-
 		return true;
+
+		// if( !preg_match($rule[1], $this->data, $matches, 0, $this->pos) )
+		// 	return true;
+
+		// $this->pos += strlen( $matches[0] );
+
+		// if( isset($rule[2][$matches[0]]) )
+		// {
+		// 	if( $rule[2][$matches[0]] != ' ' )
+		// 		$this->Run( $rule[2][$matches[0]] );
+		// 	return $rule[4];
+		// }
+		// else if( $rule[3] )
+		// {
+		// 	if( $rule[3] != ' ' )
+		// 		$this->Run( $rule[3] );
+		// 	return $rule[4];
+		// }
+
+		// return true;
 	}
 
 	protected function Capture( &$rule ): bool
@@ -1166,7 +1200,7 @@ class Parser
 	 */
 	public function GetLineFromPosition( int $pos ): int
 	{
-		if( $pos < $this->lfpos )
+		if( $pos < $this->linefeeds[$this->lfpos] )
 			$this->lfpos = 0;
 
 		for( $y = count($this->linefeeds); $this->lfpos < $y; ++$this->lfpos )
@@ -1176,17 +1210,25 @@ class Parser
 		return 0;
 	}
 
+	/**
+	 * Ustawia podane w argumencie reguły parsowania plików.
+	 *
+	 * PARAMETERS:
+	 *     $data Reguły parsowania plików.
+	 */
 	public function GetRulesFromString( string $data ): void
 	{
 		$this->rules = [];
 		$rules = json_decode( $data, true );
 
+		// ładuj wszystkie kroki do pamięci
 		if( isset($rules['STEPS']) )
 			foreach( $rules['STEPS'] as $name => $step )
 			{
 				$rule = [];
 				foreach( $step as $key => $value )
 				{
+					// sprawdzaj czy funkcje istnieją
 					if( !isset($this->mappings[$value[0]]) )
 					{
 						Logger::Log(
@@ -1213,6 +1255,12 @@ class Parser
 		$this->startpt = $rules['START'] ?? 'ENTRY';
 	}
 
+	/**
+	 * Pobiera reguły parsowania plików z pliku i ustawia je w aplikacji.
+	 *
+	 * PARAMETERS:
+	 *     $file Plik z którego pobierane mają być reguły.
+	 */
 	public function GetRulesFromFile( string $file ): void
 	{
 		if( !file_exists($file) )
@@ -1261,6 +1309,18 @@ class Parser
 			$retv .= $retv == ''
 				? '"' . $this->ReadableChar($key) . '"'
 				: ', "' . $this->ReadableChar($key) . '"';
+
+		return $retv;
+	}
+
+	private function ReadableStringArray( array $str ): string
+	{
+		$retv = '';
+
+		foreach( $str as $key => $val )
+			$retv .= $retv == ''
+				? '"' . $key . '"'
+				: ', "' . $key . '"';
 
 		return $retv;
 	}
