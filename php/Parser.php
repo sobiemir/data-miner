@@ -1,7 +1,8 @@
 <?php
-require_once './php/Logger.php';
-require_once './php/GroupData.php';
-require_once './php/GroupElement.php';
+namespace ObjectMiner;
+
+use ObjectMiner\Structures\DataStructure;
+use ObjectMiner\Structures\ElementStructure;
 
 class Parser
 {
@@ -10,6 +11,7 @@ class Parser
 	public $length = 0;
 	public $pos = 0;
 
+	private $_converters = [];
 	public $rules = [];
 	public $results = [];
 	public $storage = [];
@@ -22,7 +24,8 @@ class Parser
 	public $lastgpos = 0;
 	public $starpt = 'ENTRY';
 
-	public $mappings = [];
+	private $_mappings = [];
+	private $_extensions = [];
 
 	public function __construct( string $file )
 	{
@@ -38,16 +41,17 @@ class Parser
 		$this->rules  = [];
 
 		// wskaźnik na główną strukturę
-		$this->groups[] = new GroupData();
+		$this->groups[] = new DataStructure();
 		$this->groups[0]->elements = &$this->storage;
-		$this->groups[] = new GroupData();
+		$this->groups[] = new DataStructure();
 		$this->groups[1]->elements = &$this->results;
 
-		if( !file_exists('./mappings.json') )
+		if( !file_exists(__DIR__ . '/mappings.json') )
 			return;
 
-		$this->mappings = json_decode(
-			file_get_contents('./mappings.json'),
+		// przygotuj przekierowania na funkcje
+		$this->_mappings = json_decode(
+			file_get_contents(__DIR__ . '/mappings.json'),
 			true
 		);
 	}
@@ -242,6 +246,9 @@ class Parser
 	{
 		Logger::Log('  - seek until "' . $this->ReadableChar($rule[1]) . '"' );
 
+		if( $this->length <= $this->pos )
+			return false;
+
 		// przewijaj i pobieraj znaki
 		if( $rule[3] )
 		{
@@ -275,9 +282,6 @@ class Parser
 					$this->pos++;
 		}
 		$this->pos++;
-
-		if( $this->length <= $this->pos )
-			return false;
 
 		return true;
 	}
@@ -702,6 +706,8 @@ class Parser
 	 */
 	protected function WhiteChar( array &$rule ): bool
 	{
+		if( $this->length <= $this->pos )
+			return false;
 		do
 		{
 			switch( $this->data[$this->pos] )
@@ -729,6 +735,20 @@ class Parser
 		return false;
 	}
 
+	/**
+	 * Wchodzi lub wychodzi ze schowka, do którego zapisywane będą dane.
+	 *
+	 * DESCRIPTION:
+	 *     Schowek przechowuje dane w tym samym miejscu, do którego zapisywane są dane poszczególnych grup.
+	 *     Odróżnia go jednak od reszty to, że dane w nim zapisywane są do indeksu o numerze 0, oraz grupy schowka
+	 *     nie mogą być zagnieżdżane, zawsze jest tylko jeden poziom schowka.
+	 *     Dane schowka przechowywane są przez działanie skryptu i mogą być potem wykorzystywane przez różne reguły.
+	 *
+	 * PARAMETERS:
+	 *     $rule Tablica z argumentami dla reguły.
+	 *           - 0 > Indeks zarezerwowany.
+	 *           - 1 > Nazwa grupy w schowku do której program ma wejść, lub wartość FALSE.
+	 */
 	protected function Storage( array &$rule ): bool
 	{
 		if( $rule[1] )
@@ -740,9 +760,9 @@ class Parser
 
 			// dodaj nowy element lub stwórz tablicę z nowym elementem
 			if( isset($group->elements[$rule[1]]) )
-				$group->elements[$rule[1]][] = new GroupElement();
+				$group->elements[$rule[1]][] = new ElementStructure();
 			else
-				$group->elements[$rule[1]] = [new GroupElement()];
+				$group->elements[$rule[1]] = [new ElementStructure()];
 			
 			$this->gcontent[$this->gpos] = '';
 
@@ -800,10 +820,11 @@ class Parser
 	 */
 	protected function Group( array &$rule ): bool
 	{
+
 		if( $rule[1] )
 			Logger::Log( "  - enter to: {$rule[1]}" );
-		else
-			Logger::Log( "  - exit from: {$this->groups[$this->gpos]->name}" );
+		else if( $this->gpos > 0 )
+			Logger::Log( "  - exit from: {$this->groups[$this->gpos]->name}, value: {$this->gcontent[$this->gpos]}" );
 
 		// wejście do grupy
 		if( $rule[1] )
@@ -814,7 +835,7 @@ class Parser
 
 			// dodaj pozycję gdy nie istnieje
 			if( !isset($this->groups[$this->gpos]) )
-				$this->groups[$this->gpos] = new GroupData();
+				$this->groups[$this->gpos] = new DataStructure();
 
 			$group = &$this->groups[$this->gpos];
 
@@ -833,9 +854,9 @@ class Parser
 
 			// dodaj nowy element lub stwórz tablicę z nowym elementem
 			if( isset($group->elements[$rule[1]]) )
-				$group->elements[$rule[1]][] = new GroupElement();
+				$group->elements[$rule[1]][] = new ElementStructure();
 			else
-				$group->elements[$rule[1]] = [new GroupElement()];
+				$group->elements[$rule[1]] = [new ElementStructure()];
 
 			$this->gcontent[$this->gpos] = '';
 
@@ -875,26 +896,6 @@ class Parser
 	}
 
 	/**
-	 * Usypia działanie skryptu na podaną ilość sekund.
-	 *
-	 * CODE:
-	 *     $this->Sleep( ['', 1] );
-	 *
-	 * PARAMETERS:
-	 *     $rule Tablica z argumentami dla reguły.
-	 *           - 0 > Indeks zarezerwowany.
-	 *           - 1 > Ilość sekund uśpienia skryptu.
-	 *
-	 * RETURNS:
-	 *     Zawsze wartość TRUE.
-	 */
-	protected function Sleep( array &$rule ): bool
-	{
-		sleep( $rule[1] );
-		return true;
-	}
-
-	/**
 	 * Zapisuje dane podane w parametrze do grupy, aktualny znak ze strumienia lub dane ze schowka.
 	 * 
 	 * DESCRIPTION:
@@ -916,8 +917,7 @@ class Parser
 	 *     $rule Tablica z argumentami dla reguły.
 	 *           - 0 > Indeks zarezerwowany.
 	 *           - 1 > Dane do zapisu, index lub FALSE w przypadku zapisu ze strumienia.
-	 *           - 2 > Czy dane mają być zapisane ze schowka?
-	 *           - 3 > Indeks elementu ze schowka lub -1 dla automatycznego wyszukiwania.
+	 *           - 2 > Indeks elementu ze schowka lub -1 dla automatycznego wyszukiwania.
 	 *
 	 * RETURNS:
 	 *     Zawsze wartość TRUE.
@@ -1038,6 +1038,9 @@ class Parser
 	 */
 	protected function Next( &$rule ): bool
 	{
+		if( $this->length <= $this->pos )
+			return false;
+
 		Logger::Log('  - expecting: "' . $this->ReadableChar($rule[1]) . '" is: "' .
 			$this->ReadableChar($this->data[$this->pos]) . '"' );
 
@@ -1081,15 +1084,41 @@ class Parser
 		Logger::IndentInc();
 
 		foreach( $this->rules[$rule] as $val )
-		{
-			Logger::Log( "+ {$val[0]}" );
-			if( !$this->{$val[0]}($val) )
-				break;
-		}
+			if( is_array($val[0]) )
+			{
+				Logger::Log( "+ {$val[0][0]}" );
+				if( !$val[0][1]->Run($val) )
+					break;
+			}
+			else
+			{
+				Logger::Log( "+ {$val[0]}" );
+				if( !$this->{$val[0]}($val) )
+					break;
+			}
 
 		Logger::IndentDec();
 	}
 
+	/**
+	 * Testuje dane ze strumienia wyrażeniem regularnym i wykonuje segment przypisany do danego wyrazu.
+	 *
+	 * DESCRIPTION:
+	 *     Wyrażenie regularne sprawdzane jest od aktualnego miejsca w strumieniu danych.
+	 *     Pobrane dane przez wyrażenie regularne, sprawdzane są z tablicą wyrazów, przekazanych do funkcji.
+	 *     W przypadku gdy wyraz zgadza się z pobranych wyrażeniem, wykonywana jest reguła, przypisana do niego.
+	 *     Gdy jednak wyraz nie zostanie dopasowany, wykonywany jest segment, przekazany jako ostatni element tablicy.
+	 *
+	 * PARAMETERS:
+	 *     $rule Tablica z argumentami dla reguły.
+	 *           - 0 > Indeks zarezerwowany.
+	 *           - 1 > Wyrażenie regularne, względem którego sprawdzane będą dane.
+	 *           - 2 > Lista wyrazów do sprawdzenia z pobranymi danymi.
+	 *           - 3 > Co funkcja, po wykonaniu reguły ma zwrócić?
+	 *
+	 * RETURNS:
+	 *     Wartość TRUE lub FALSE, w zależności od podanego ostatniego parametru.
+	 */
 	protected function String( &$rule ): bool
 	{
 		if( $this->length <= $this->pos )
@@ -1119,28 +1148,25 @@ class Parser
 			return $rule[4];
 		}
 		return true;
-
-		// if( !preg_match($rule[1], $this->data, $matches, 0, $this->pos) )
-		// 	return true;
-
-		// $this->pos += strlen( $matches[0] );
-
-		// if( isset($rule[2][$matches[0]]) )
-		// {
-		// 	if( $rule[2][$matches[0]] != ' ' )
-		// 		$this->Run( $rule[2][$matches[0]] );
-		// 	return $rule[4];
-		// }
-		// else if( $rule[3] )
-		// {
-		// 	if( $rule[3] != ' ' )
-		// 		$this->Run( $rule[3] );
-		// 	return $rule[4];
-		// }
-
-		// return true;
 	}
 
+	/**
+	 * Pobiera znaki ze strumienia danych do aktualnie otwartej grupy.
+	 *
+	 * DESCRIPTION:
+	 *     Pobiera znaki i zapisuje do grupy, przesuwając aktualny kursor w strumieniu danych o ilość pobranych znaków.
+	 *     W przypadku gdy strumień nie znajdzie dopasowania do wyrażenia regularnego, wykonywany jest segment, podany
+	 *     w tablicy parametrów.
+	 *
+	 * PARAMETERS:
+	 *     $rule Tablica z argumentami dla reguły.
+	 *           - 0 > Indeks zarezerwowany.
+	 *           - 1 > Wyrażenie regularne, względem którego pobierane będą dane.
+	 *           - 2 > Nazwa segmentu do wykonania lub wartość FALSE.
+	 *
+	 * RETURNS:
+	 *     Zawsze wartość TRUE.
+	 */
 	protected function Capture( &$rule ): bool
 	{
 		if( !preg_match($rule[1], $this->data, $matches, 0, $this->pos) )
@@ -1200,7 +1226,7 @@ class Parser
 	 */
 	public function GetLineFromPosition( int $pos ): int
 	{
-		if( $pos < $this->linefeeds[$this->lfpos] )
+		if( !isset($this->linefeeds[$this->lfpos]) || $pos < $this->linefeeds[$this->lfpos] )
 			$this->lfpos = 0;
 
 		for( $y = count($this->linefeeds); $this->lfpos < $y; ++$this->lfpos )
@@ -1226,10 +1252,13 @@ class Parser
 			foreach( $rules['STEPS'] as $name => $step )
 			{
 				$rule = [];
-				foreach( $step as $key => $value )
+				foreach( $step as $key => &$value )
 				{
+					// zamień wszystkie znaki na duże
+					$step[$key][0] = strtoupper( $step[$key][0] );
+
 					// sprawdzaj czy funkcje istnieją
-					if( !isset($this->mappings[$value[0]]) )
+					if( !isset($this->_mappings[$value[0]]) )
 					{
 						Logger::Log(
 							"ERROR: Function ${$value[0]} not exist!",
@@ -1238,7 +1267,7 @@ class Parser
 						continue;
 					}
 
-					$map    = $this->mappings[$value[0]];
+					$map    = $this->_mappings[$value[0]];
 					$single = [$map[1]];
 
 					for( $x = 0, $y = 1; $x < $map[2]; ++$x )
@@ -1252,7 +1281,30 @@ class Parser
 				if( count($rule) > 0 )
 					$this->rules[$name] = $rule;
 			}
+
+
+		// ładuj zdefiniowane konwertery
+		if( isset($rules['CONVERTERS']) )
+			foreach( $rules['CONVERTERS'] as $name => $converter )
+			{
+				if( !class_exists("\\ObjectMiner\\Converters\\{$name}Converter") )
+				{
+					Logger::Log(
+						"ERROR: Converter for ${name} format does't exist!",
+						ZLOG_ERROR
+					);
+					continue;
+				}
+				$this->_converters[$name] = $converter;
+			}
+
+		// punkt startowy, domyślnie ENTRY
 		$this->startpt = $rules['START'] ?? 'ENTRY';
+	}
+
+	public function GetConverters(): array
+	{
+		return $this->_converters;
 	}
 
 	/**
@@ -1278,7 +1330,7 @@ class Parser
 	 * RETURNS:
 	 *     Podmieniony tekst dla znaku lub oryginalny znak.
 	 */
-	private function ReadableChar( string $chr ): string
+	public function ReadableChar( string $chr ): string
 	{
 		static $rplcs = [
 			"\t" => '\t',
@@ -1301,7 +1353,7 @@ class Parser
 	 * RETURNS:
 	 *     Tekst reprezentujący tablicę w postaci ciągu znaków.
 	 */
-	private function ReadableCharArray( array $chr ): string
+	public function ReadableCharArray( array $chr ): string
 	{
 		$retv = '';
 
@@ -1313,7 +1365,7 @@ class Parser
 		return $retv;
 	}
 
-	private function ReadableStringArray( array $str ): string
+	public function ReadableStringArray( array $str ): string
 	{
 		$retv = '';
 
@@ -1323,5 +1375,28 @@ class Parser
 				: ', "' . $key . '"';
 
 		return $retv;
+	}
+
+	public function LoadExtensions(): void
+	{
+		// załaduj wtyczki
+		$entities = array_diff( scandir(__DIR__ . '/Extensions'), array('.', '..') );
+		foreach( $entities as $entity )
+		{
+			if( is_dir(__DIR__ . "/Extensions/{$entity}") )
+				continue;
+
+			$classname = str_replace( '.php', '', $entity );
+			$class = "\\ObjectMiner\\Extensions\\{$classname}";
+
+			$this->_extensions[$classname] = new $class( $this );
+
+			$mappings = $this->_extensions[$classname]->GetMappings();
+			foreach( $mappings as $key => $mapping )
+			{
+				$this->_mappings[$key]    = $mapping;
+				$this->_mappings[$key][1] = [$key, $this->_extensions[$classname]];
+			}
+		}
 	}
 }

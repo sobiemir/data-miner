@@ -1,0 +1,138 @@
+{
+	"START": "ENTRY",
+
+	"STEPS": {
+
+		/* ================================================================== *
+		 * PUNKT WEJŚCIOWY                                                    *
+		 * ================================================================== */
+		"ENTRY": [
+			// usuń zbędny tekst i komentarze
+			["loop", "PREPARE_TEXT"],
+			// przewiń na początek
+			["rewind", 0],
+			// pomiń wszystkie białe znaki
+			["whitechar"],
+			// przechwytuj symbole
+			["loop", "CAPTURE_DATA"]
+		],
+
+		/* ================================================================== *
+		 * WYSZUKIWANIE KOMENTARZY I STAŁYCH TEKSTOWYCH                       *
+		 * ================================================================== */
+		"PREPARE_TEXT": [
+			["seek_until", ";", false],
+			["execute", "COMMENT"]
+		],
+
+		/* ================================================================== *
+		 * USUWANIE KOMENTARZA LINIOWEGO                                      *
+		 * ================================================================== */
+		"COMMENT": [
+			["seek", -1],
+			["replace_until", "\n", " ", false]
+		],
+
+		/* ================================================================== *
+		 * PRZECHWYTYWANIE SYMBOLI Z TEKSTU                                   *
+		 * ================================================================== */
+		"CAPTURE_DATA": [
+			["whitechar"],
+			["next_check", "[", "SECTION", "DATA_CAPTURE"]
+		],
+
+		"SECTION": [
+			["group", false],
+			["group", "SECTION"],
+			["seek_until", "]", true],
+			["seek", 1],
+			["loop", "CAPTURE_DATA"],
+			["group", false]
+		],
+
+		"DATA_CAPTURE": [
+			["group", "DATA"],
+			["seek_until", "=", true],
+			["whitechar"],
+			["group", "VALUE"],
+			["seek_until", "\n", true],
+			["group", false],
+			["group", false]
+		]
+	},
+	"CONVERTERS": {
+		"JSON": {
+			"#SETTINGS": {
+				"filename": "ini",
+				"extension": "json",
+				"pretty": true
+			},
+			"DATA": {
+				"key": "%",
+				"value": "%.VALUE:0",
+				"required": "key",
+				"enter": "DATA"
+			},
+			"SECTIONS": {
+				"key": "%",
+				"value": {
+					"key": "%",
+					"value": "%.VALUE:0",
+					"required": "key",
+					"enter": "DATA"
+				},
+				"required": "key",
+				"enter": "SECTION"
+			}
+		},
+		"XML": {
+			"#SETTINGS": {
+				"filename": "ini",
+				"extension": "xml",
+				"root": {
+					"tag": "settings"
+				},
+				"pretty": true
+			},
+			"DATA": {
+				"tag": "key",
+				"@name": "%",
+				"@value": "%.VALUE:0",
+				"required": "@name",
+				"enter": "DATA"
+			},
+			"SECTIONS": {
+				"tag": "section",
+				"@name": "%",
+				"value": {
+					"tag": "key",
+					"@name": "%",
+					"@value": "%.VALUE:0",
+					"required": "@name",
+					"enter": "DATA"
+				},
+				"required": "@name",
+				"enter": "SECTION"
+			}
+		},
+		"LIST": {
+			"DATA": {
+				"key": "%",
+				"value": "%.VALUE:0",
+				"required": "key",
+				"enter": "DATA"
+			},
+			"SECTIONS": {
+				"key": "%",
+				"value": {
+					"key": "%",
+					"value": "%.VALUE:0",
+					"required": "key",
+					"enter": "DATA"
+				},
+				"required": "key",
+				"enter": "SECTION"
+			}
+		}
+	}
+}

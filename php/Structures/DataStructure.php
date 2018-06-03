@@ -1,7 +1,7 @@
 <?php
-require_once './php/GroupElement.php';
+namespace ObjectMiner\Structures;
 
-class GroupData
+class DataStructure
 {
 	public $name;
 	public $group;
@@ -12,7 +12,7 @@ class GroupData
 	public function __construct()
 	{
 		$this->name     = '';
-		$this->group    = new GroupElement();
+		$this->group    = new ElementStructure();
 		$this->elements = [];
 		$this->parent   = null;
 		$this->pos      = 0;

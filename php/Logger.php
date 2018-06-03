@@ -1,4 +1,5 @@
 <?php
+namespace ObjectMiner;
 
 define( 'ZLOG_NONE',    0x0 );
 define( 'ZLOG_ERROR',   0x1 );

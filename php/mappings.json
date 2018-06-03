@@ -15,7 +15,7 @@
 		[[true        ], "Seek",              2, [-1,  0        ]
 	],
 	"SEEK_UNTIL":
-		[[false       ], "SeekUntil",         3, [-1, -1,  0    ]
+		[[false       ], "SeekUntil",         3, [-1,  0, -1    ]
 	],
 	"SEEK_UNTIL_ESCAPE":
 		[[            ], "SeekUntil",         3, [-1, -1, -1    ]
@@ -75,24 +75,24 @@
 		[[true        ], "Next",              4, [-1, -1, -1,  0]
 	],
 	"WRITE":
-		[[false       ], "Write",             2, [-1,  0        ]
+		[[false       ], "Write",             3, [-1,  0        ]
 	],
 	"WRITE_FROM_STREAM":
-		[[false, false], "Write",             2, [ 0,  1        ]
+		[[false, false], "Write",             3, [ 0,  1        ]
 	],
 	"WRITE_FROM_STORAGE":
-		[[            ], "Write",             2, [-1, -1        ]
+		[[            ], "Write",             3, [-1, -1        ]
 	],
 	"WRITE_AUTO_STORAGE":
-		[[-1          ], "Write",             2, [-1,  0        ]
+		[[-1          ], "Write",             3, [-1,  0        ]
 	],
 	"WHITECHAR":
 		[[false, false], "WhiteChar",         2, [ 0,  1        ]
 	],
-	"WHITECHAR_ESCAPE":
-		[[false, true ], "WhiteChar",         2, [ 0,  1        ]
-	],
 	"WHITESPACE":
-		[[true,  true ], "WhiteChar",         2, [ 0,  1        ]
+		[[true,  false], "WhiteChar",         2, [ 0,  1        ]
+	],
+	"WHITESPACE_ESCAPE":
+		[[true        ], "WhiteChar",         2, [ 0, -1        ]
 	]
 }

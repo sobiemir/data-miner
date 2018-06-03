@@ -1,6 +1,7 @@
 <?php
+namespace ObjectMiner\Structures;
 
-class GroupElement
+class ElementStructure
 {
 	public $content;
 	public $start;
