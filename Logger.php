@@ -41,11 +41,14 @@ abstract class Logger
 	 */
 	private static $_logFile = null;
 
+	/**
+	 * Prefiksy wiadomości, wyświetlanych w konsoli i pliku.
+	 */
 	private static $_levelPrefixes = [
-		ZLOG_ERROR => "![ERROR]: ",
-		ZLOG_WARNING => ":[WARNING]: ",
-		ZLOG_INFO => ".[INFO]: ",
-		ZLOG_NOTICE => "# "
+		ZLOG_ERROR   => "ERROR: ",
+		ZLOG_WARNING => "WARNING: ",
+		ZLOG_INFO    => "INFO: ",
+		ZLOG_NOTICE  => ""
 	];
 
 	/**
@@ -61,10 +64,10 @@ abstract class Logger
 	 *     - ZLOG_INFO: wyświetla tylko informacje.
 	 *     - ZLOG_NOTICE: wyświetla tylko notatki.
 	 *     - ZLOG_NONE: nie wyświetla żadnych wiadomości.
-	 *     Poziomy można łączyć, można więc podać wartość LOG_ERR | LOG_INFO
-	 *     aby wyświetlać tylko błędy i informacje.
+	 *     Poziomy można łączyć, można więc podać wartość LOG_ERR | LOG_INFO aby wyświetlać tylko błędy i informacje.
 	 *
-	 * @param $level Poziom wyświetlanych wiadomości.
+	 * PARAMETERS:
+	 *     level: Poziom dopuszczonych do wyświetlenia wiadomości.
 	 */
 	public static function SetLogLevel( int $level ): void
 	{
@@ -80,9 +83,10 @@ abstract class Logger
 	 *     w pierwszym parametrze wartość TRUE.
 	 *     Aby wiadomości zapisywać do pliku, należy w drugim parametrze
 	 *     podać jego ścieżkę, w przeciwnym wypadku zaś wartość NULL.
-	 * 
-	 * @param $variant Wariant wyświetlanych wiadomości.
-	 * @param $file    Nazwa pliku do którego zapisywane będą wiadomości.
+	 *
+	 * PARAMETES:
+	 *     variant: Wariant wyświetlanych wiadomości.
+	 *     file:    Nazwa pliku do którego zapisywane będą wiadomości.
 	 */
 	public static function SetLogOutput( bool $console, string $file ): void
 	{
@@ -122,8 +126,9 @@ abstract class Logger
 	 *     Domyślnie wyświetlane są wszystkie poziomy.
 	 *     Dostępne poziomy wypisane zostały w funkcji SetLogLevel.
 	 *
-	 * @param $msg   Wiadomość do wyświetlenia.
-	 * @param $level Poziom (typ) wyświetlanej wiadomości.
+	 * PARAMETERS:
+	 *     msg:   Wiadomość do wyświetlenia.
+	 *     level: Poziom (typ) wyświetlanej wiadomości.
 	 */
 	public static function Log( string $msg, int $level = ZLOG_NOTICE ): void
 	{

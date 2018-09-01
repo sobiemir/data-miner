@@ -3,14 +3,37 @@ namespace ObjectMiner;
 
 class ObjectMiner
 {
+	/**
+	 * Klasa parsera, używana do przetwarzania plików.
+	 */
 	private $_parser = null;
+
+	/**
+	 * Lista dostępnych konwerterów danych.
+	 */
 	private $_converters = [];
 
+	/**
+	 * Konstruktor klasy ObjectMiner.
+	 */
 	public function __construct()
 	{
 		spl_autoload_register( __NAMESPACE__ . '\\ObjectMiner::Autoloader' );
 	}
 
+	/**
+	 * Uruchamia funkcje przetwarzające dane z podanego pliku startowego.
+	 *
+	 * DESCRIPTION:
+	 *     Funkcja przetwarza plik względem reguł, wyodrębniając z niego dane.
+	 *     Pliki z regułami, umieszczone w odpowiednim folderze, zapisywane są w zmodyfikowanym formacie JSON.
+	 *     Na pliku tym dodatkowo przepuszczane są reguły, usuwające z niego komentarze, gdyż standardowo
+	 *     format JSON nie posiada możliwosci ich zamieszczania.
+	 *
+	 * PARAMETERS:
+	 *     file:  Odczytywany plik startowy.
+	 *     rules: Nazwa reguł, używana do przetwarzania plików.
+	 */
 	public function Run( string $file, string $rules ): void
 	{
 		$parser = new Parser( __DIR__ . "/Rules/{$rules}.json" );
@@ -27,6 +50,17 @@ class ObjectMiner
 		$this->_converters = $this->_parser->GetConverters();
 	}
 
+	/**
+	 * Zapisuje przetworzone dane do pliku.
+	 *
+	 * DESCRIPTION:
+	 *     Funkcja do zapisu danych używa zdefiniowanych w konfiguracji konwerterów.
+	 *     Konwertery przygotowują przetworzone wcześniej dane do danego formatu, który potem zapisywany jest
+	 *     do pliku o nazwie, podanej w konfiguracji.
+	 *
+	 * PARAMETERS:
+	 *     path: Ścieżka do zapisu pliku z przetworzonymi danymi.
+	 */
 	public function Save( string $path = './' ): void
 	{
 		if( $this->_parser == null )
@@ -48,6 +82,12 @@ class ObjectMiner
 		}
 	}
 
+	/**
+	 * Automat do importu brakujących obiektów.
+	 *
+	 * PARAMETERS:
+	 *     name: Nazwa obiektu do załadowania.
+	 */
 	public static function Autoloader( string $name ): void
 	{
 		$parts = explode( '\\', $name );

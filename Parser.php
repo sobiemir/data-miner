@@ -101,7 +101,7 @@ class Parser
 	 *     $this->Loop( ['', 'RULE_TO_LOOP'] );
 	 *
 	 * PARAMETERS:
-	 *     $rule Tablica z argumentami dla reguły.
+	 *     rule Tablica z argumentami dla reguły.
 	 *           - 0 > Indeks zarezerwowany.
 	 *           - 1 > Nazwa reguły do powtarzania w pętli.
 	 *
